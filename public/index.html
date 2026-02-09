@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe Online</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Username Screen -->
+    <div id="usernameScreen" class="screen active">
+        <div class="container">
+            <h1 class="title">Tic Tac Toe</h1>
+            <div class="card">
+                <h2>Benutzername eingeben</h2>
+                <input type="text" id="usernameInput" placeholder="Dein Name" maxlength="20">
+                <button id="submitUsername" class="btn btn-primary">Weiter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Screen -->
+    <div id="menuScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Tic Tac Toe</h1>
+            <div class="welcome">Willkommen, <span id="usernameDisplay"></span>!</div>
+            <div class="menu-buttons">
+                <button id="playBotBtn" class="btn btn-primary btn-large">
+                    <span class="btn-icon">🤖</span>
+                    Gegen Bot spielen
+                </button>
+                <button id="playMultiplayerBtn" class="btn btn-secondary btn-large">
+                    <span class="btn-icon">👥</span>
+                    Mehrspieler
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multiplayer Options Screen -->
+    <div id="optionsScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Spieloptionen</h1>
+            <div class="card">
+                <h2>Spieleinstellungen</h2>
+                
+                <div class="option-group">
+                    <label for="matchCount">Anzahl der Spiele:</label>
+                    <input type="range" id="matchCount" min="1" max="50" value="1">
+                    <span id="matchCountValue">1</span>
+                </div>
+
+                <div class="option-group">
+                    <label>Spielmodus:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="gameMode" value="normal" checked>
+                            <span>Normal (ohne Punkte)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="gameMode" value="competitive">
+                            <span>Competitive (mit Punkten)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="startSearchBtn" class="btn btn-primary">Gegner suchen</button>
+                    <button id="backToMenuBtn" class="btn btn-secondary">Zurück</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Searching Screen -->
+    <div id="searchingScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Suche Gegner...</h1>
+            <div class="card">
+                <div class="spinner"></div>
+                <p class="searching-text">Warte auf einen weiteren Spieler...</p>
+                <button id="cancelSearchBtn" class="btn btn-secondary">Suche abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+        <div class="game-container">
+            <div class="game-header">
+                <div class="player-info">
+                    <div class="player-name" id="playerName"></div>
+                    <div class="player-symbol" id="playerSymbol"></div>
+                </div>
+                <div class="game-status">
+                    <div id="turnIndicator" class="turn-indicator">Dein Zug</div>
+                    <div id="matchInfo" class="match-info"></div>
+                </div>
+                <div class="opponent-info">
+                    <div class="player-name" id="opponentName"></div>
+                    <div class="player-symbol" id="opponentSymbol"></div>
+                </div>
+            </div>
+
+            <div id="scoreBoard" class="score-board hidden">
+                <div class="score-item">
+                    <span class="score-label">Du:</span>
+                    <span id="yourScore" class="score-value">0</span>
+                </div>
+                <div class="score-item">
+                    <span class="score-label">Unentschieden:</span>
+                    <span id="drawScore" class="score-value">0</span>
+                </div>
+                <div class="score-item">
+                    <span class="score-label">Gegner:</span>
+                    <span id="opponentScore" class="score-value">0</span>
+                </div>
+            </div>
+
+            <div class="board-container">
+                <div id="board" class="board">
+                    <div class="cell" data-index="0"></div>
+                    <div class="cell" data-index="1"></div>
+                    <div class="cell" data-index="2"></div>
+                    <div class="cell" data-index="3"></div>
+                    <div class="cell" data-index="4"></div>
+                    <div class="cell" data-index="5"></div>
+                    <div class="cell" data-index="6"></div>
+                    <div class="cell" data-index="7"></div>
+                    <div class="cell" data-index="8"></div>
+                </div>
+            </div>
+
+            <button id="leaveGameBtn" class="btn btn-secondary">Spiel verlassen</button>
+        </div>
+    </div>
+
+    <!-- Game End Modal -->
+    <div id="gameEndModal" class="modal">
+        <div class="modal-content">
+            <h2 id="gameEndTitle"></h2>
+            <p id="gameEndMessage"></p>
+            <div id="seriesScores" class="series-scores hidden"></div>
+            <button id="backToMenuFromGame" class="btn btn-primary">Zurück zum Menü</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

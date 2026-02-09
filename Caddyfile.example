@@ -1,0 +1,47 @@
+# Caddy Konfiguration für Tic Tac Toe Online
+# 
+# Diese Datei zeigt, wie man den Tic Tac Toe Server mit Caddy als Reverse Proxy einrichtet.
+# 
+# Verwendung:
+# 1. Ersetze "deine-domain.de" mit deiner tatsächlichen Domain
+# 2. Kopiere diese Konfiguration in deine Caddyfile (normalerweise in /etc/caddy/Caddyfile)
+# 3. Lade Caddy neu: sudo systemctl reload caddy
+#
+# Für lokales Testing (ohne Domain):
+# :80 {
+#     reverse_proxy localhost:6575
+# }
+
+# Mit Domain und automatischem HTTPS:
+deine-domain.de {
+    # Reverse Proxy zu Node.js Server
+    reverse_proxy localhost:6575 {
+        # WebSocket Support (wichtig für Socket.IO)
+        header_up Upgrade {>Upgrade}
+        header_up Connection {>Connection}
+    }
+
+    # Optional: Logs
+    log {
+        output file /var/log/caddy/tictactoe.log
+    }
+
+    # Optional: Kompression
+    encode gzip zstd
+}
+
+# Alternativ: Mit Subdomain
+# tictactoe.deine-domain.de {
+#     reverse_proxy localhost:6575 {
+#         header_up Upgrade {>Upgrade}
+#         header_up Connection {>Connection}
+#     }
+# }
+
+# Für mehrere Domains:
+# deine-domain.de, www.deine-domain.de {
+#     reverse_proxy localhost:6575 {
+#         header_up Upgrade {>Upgrade}
+#         header_up Connection {>Connection}
+#     }
+# }

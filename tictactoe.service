@@ -1,0 +1,19 @@
+[Unit]
+Description=Tic Tac Toe Online Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Websites/TicTacToe
+ExecStart=/usr/bin/node /root/Websites/TicTacToe/server.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=tictactoe
+Environment=NODE_ENV=production
+Environment=PORT=6575
+
+[Install]
+WantedBy=multi-user.target
