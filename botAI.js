@@ -1,32 +1,95 @@
 class BotAI {
     static getMove(board, botSymbol = 'O', playerSymbol = 'X') {
-        // Minimax-Algorithmus für intelligente Bot-Züge
-        
-        // Zuerst prüfen ob Bot gewinnen kann
-        const winningMove = this.findWinningMove(board, botSymbol);
-        if (winningMove !== null) return winningMove;
+        // Minimax-Algorithmus für unbesiegbaren Bot
+        const bestMove = this.minimax(board, botSymbol, botSymbol, playerSymbol);
+        return bestMove.index;
+    }
 
-        // Dann prüfen ob Spieler blockiert werden muss
-        const blockingMove = this.findWinningMove(board, playerSymbol);
-        if (blockingMove !== null) return blockingMove;
-
-        // Zentrum bevorzugen
-        if (board[4] === null) return 4;
-
-        // Ecken bevorzugen
-        const corners = [0, 2, 6, 8];
-        const availableCorners = corners.filter(pos => board[pos] === null);
-        if (availableCorners.length > 0) {
-            return availableCorners[Math.floor(Math.random() * availableCorners.length)];
-        }
-
-        // Sonst irgendein freies Feld
-        const availableMoves = board
+    static minimax(board, currentSymbol, botSymbol, playerSymbol) {
+        // Verfügbare Züge finden
+        const availableSpots = board
             .map((cell, index) => cell === null ? index : null)
             .filter(index => index !== null);
 
-        if (availableMoves.length > 0) {
-            return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+        // Terminal-Zustände prüfen
+        const winner = this.checkWinner(board);
+        if (winner === botSymbol) {
+            return { score: 10 };
+        } else if (winner === playerSymbol) {
+            return { score: -10 };
+        } else if (availableSpots.length === 0) {
+            return { score: 0 };
+        }
+
+        // Alle möglichen Züge durchgehen
+        const moves = [];
+
+        for (let i = 0; i < availableSpots.length; i++) {
+            const move = {};
+            move.index = availableSpots[i];
+
+            // Zug simulieren
+            board[availableSpots[i]] = currentSymbol;
+
+            // Rekursiv minimax aufrufen
+            if (currentSymbol === botSymbol) {
+                const result = this.minimax(board, playerSymbol, botSymbol, playerSymbol);
+                move.score = result.score;
+            } else {
+                const result = this.minimax(board, botSymbol, botSymbol, playerSymbol);
+                move.score = result.score;
+            }
+
+            // Zug rückgängig machen
+            board[availableSpots[i]] = null;
+
+            moves.push(move);
+        }
+
+        // Besten Zug wählen
+        let bestMove;
+        if (currentSymbol === botSymbol) {
+            // Maximieren für Bot
+            let bestScore = -Infinity;
+            for (let i = 0; i < moves.length; i++) {
+                if (moves[i].score > bestScore) {
+                    bestScore = moves[i].score;
+                    bestMove = i;
+                }
+            }
+        } else {
+            // Minimieren für Spieler
+            let bestScore = Infinity;
+            for (let i = 0; i < moves.length; i++) {
+                if (moves[i].score < bestScore) {
+                    bestScore = moves[i].score;
+                    bestMove = i;
+                }
+            }
+        }
+
+        return moves[bestMove];
+    }
+
+    static checkWinner(board) {
+        const lines = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6]
+        ];
+
+        for (const line of lines) {
+            const [a, b, c] = line;
+            if (board[a] && 
+                board[a] === board[b] && 
+                board[a] === board[c]) {
+                return board[a];
+            }
         }
 
         return null;

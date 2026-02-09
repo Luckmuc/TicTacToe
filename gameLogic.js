@@ -20,7 +20,7 @@ class GameLogic {
         this.currentPlayer = 'X';
     }
 
-    makeMove(position, symbol) {
+    makeMove(position, symbol, isPlayer1 = true) {
         if (this.board[position] !== null) {
             return { valid: false };
         }
@@ -34,15 +34,17 @@ class GameLogic {
             // Punkte aktualisieren
             if (this.options && this.options.competitive) {
                 if (this.isBot) {
+                    // Bei Bot: player1 ist immer der Mensch
                     if (winner === this.playerSymbol) {
                         this.scores.player1++;
                     } else {
                         this.scores.player2++;
                     }
                 } else {
+                    // Bei Multiplayer: Korrekt nach player1/player2 zuordnen
                     if (winner === this.player1Symbol) {
                         this.scores.player1++;
-                    } else {
+                    } else if (winner === this.player2Symbol) {
                         this.scores.player2++;
                     }
                 }

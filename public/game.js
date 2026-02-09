@@ -3,12 +3,16 @@ const socket = io();
 // State
 let username = '';
 let currentGameId = null;
+let currentLobbyId = null;
 let mySymbol = null;
 let opponentSymbol = null;
 let opponentName = '';
+let yourUsername = '';
 let gameMode = 'bot';
 let isMyTurn = false;
 let gameOptions = null;
+let isPlayer1 = false;
+let isReady = false;
 
 // Screens
 const screens = {
@@ -16,6 +20,7 @@ const screens = {
     menu: document.getElementById('menuScreen'),
     options: document.getElementById('optionsScreen'),
     searching: document.getElementById('searchingScreen'),
+    lobby: document.getElementById('lobbyScreen'),
     game: document.getElementById('gameScreen')
 };
 
@@ -25,11 +30,24 @@ const submitUsername = document.getElementById('submitUsername');
 const usernameDisplay = document.getElementById('usernameDisplay');
 const playBotBtn = document.getElementById('playBotBtn');
 const playMultiplayerBtn = document.getElementById('playMultiplayerBtn');
-const matchCountSlider = document.getElementById('matchCount');
-const matchCountValue = document.getElementById('matchCountValue');
 const startSearchBtn = document.getElementById('startSearchBtn');
 const backToMenuBtn = document.getElementById('backToMenuBtn');
 const cancelSearchBtn = document.getElementById('cancelSearchBtn');
+
+// Lobby Elements
+const lobbyOpponentName = document.getElementById('lobbyOpponentName');
+const lobbyMatchCountSlider = document.getElementById('lobbyMatchCount');
+const lobbyMatchCountValue = document.getElementById('lobbyMatchCountValue');
+const settingsUpdateNotice = document.getElementById('settingsUpdateNotice');
+const settingsUpdater = document.getElementById('settingsUpdater');
+const player1NameReady = document.getElementById('player1NameReady');
+const player2NameReady = document.getElementById('player2NameReady');
+const player1ReadyStatus = document.getElementById('player1ReadyStatus');
+const player2ReadyStatus = document.getElementById('player2ReadyStatus');
+const readyBtn = document.getElementById('readyBtn');
+const leaveLobbyBtn = document.getElementById('leaveLobbyBtn');
+
+// Game Elements
 const board = document.getElementById('board');
 const cells = document.querySelectorAll('.cell');
 const turnIndicator = document.getElementById('turnIndicator');
@@ -43,16 +61,30 @@ const yourScore = document.getElementById('yourScore');
 const drawScore = document.getElementById('drawScore');
 const opponentScore = document.getElementById('opponentScore');
 const leaveGameBtn = document.getElementById('leaveGameBtn');
-const gameEndModal = document.getElementById('gameEndModal');
+
+// Game End Elements
+const gameEndOverlay = document.getElementById('gameEndOverlay');
 const gameEndTitle = document.getElementById('gameEndTitle');
-const gameEndMessage = document.getElementById('gameEndMessage');
-const seriesScores = document.getElementById('seriesScores');
+const gameEndSubtitle = document.getElementById('gameEndSubtitle');
+const continueBtn = document.getElementById('continueBtn');
+const gameEndModal = document.getElementById('gameEndModal');
+const finalTitle = document.getElementById('finalTitle');
+const finalMessage = document.getElementById('finalMessage');
+const finalScores = document.getElementById('finalScores');
 const backToMenuFromGame = document.getElementById('backToMenuFromGame');
 
 // Helper Functions
 function showScreen(screenName) {
     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenName].classList.add('active');
+}
+
+function showGameEndOverlay() {
+    gameEndOverlay.classList.add('active');
+}
+
+function hideGameEndOverlay() {
+    gameEndOverlay.classList.remove('active');
 }
 
 function showModal() {
@@ -92,20 +124,8 @@ playMultiplayerBtn.addEventListener('click', () => {
 });
 
 // Options Screen
-matchCountSlider.addEventListener('input', (e) => {
-    matchCountValue.textContent = e.target.value;
-});
-
 startSearchBtn.addEventListener('click', () => {
-    const matchCount = parseInt(matchCountSlider.value);
-    const competitive = document.querySelector('input[name="gameMode"]:checked').value === 'competitive';
-    
-    gameOptions = {
-        matchCount: matchCount,
-        competitive: competitive
-    };
-
-    socket.emit('searchMatch', gameOptions);
+    socket.emit('searchMatch');
     showScreen('searching');
 });
 
@@ -118,15 +138,74 @@ cancelSearchBtn.addEventListener('click', () => {
     showScreen('menu');
 });
 
+// Lobby Screen
+lobbyMatchCountSlider.addEventListener('input', (e) => {
+    lobbyMatchCountValue.textContent = e.target.value;
+    updateLobbySettings();
+});
+
+document.querySelectorAll('input[name="lobbyGameMode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        updateLobbySettings();
+    });
+});
+
+function updateLobbySettings() {
+    if (!currentLobbyId) return;
+    
+    const matchCount = parseInt(lobbyMatchCountSlider.value);
+    const competitive = document.querySelector('input[name="lobbyGameMode"]:checked').value === 'competitive';
+    
+    socket.emit('updateSettings', {
+        lobbyId: currentLobbyId,
+        settings: {
+            matchCount: matchCount,
+            competitive: competitive
+        }
+    });
+}
+
+readyBtn.addEventListener('click', () => {
+    isReady = !isReady;
+    
+    if (isReady) {
+        readyBtn.textContent = 'Nicht bereit';
+        readyBtn.classList.remove('btn-primary');
+        readyBtn.classList.add('btn-secondary');
+    } else {
+        readyBtn.textContent = 'Bereit';
+        readyBtn.classList.remove('btn-secondary');
+        readyBtn.classList.add('btn-primary');
+    }
+    
+    socket.emit('setReady', {
+        lobbyId: currentLobbyId,
+        ready: isReady
+    });
+});
+
+leaveLobbyBtn.addEventListener('click', () => {
+    socket.emit('leaveLobby', { lobbyId: currentLobbyId });
+    currentLobbyId = null;
+    isReady = false;
+    showScreen('menu');
+});
+
 leaveGameBtn.addEventListener('click', () => {
+    hideGameEndOverlay();
     resetGame();
     showScreen('menu');
 });
 
 backToMenuFromGame.addEventListener('click', () => {
     hideModal();
+    hideGameEndOverlay();
     resetGame();
     showScreen('menu');
+});
+
+continueBtn.addEventListener('click', () => {
+    hideGameEndOverlay();
 });
 
 // Game Logic
@@ -148,10 +227,15 @@ function initGame(data) {
     currentGameId = data.gameId;
     mySymbol = data.symbol;
     opponentSymbol = data.symbol === 'X' ? 'O' : 'X';
-    opponentName = data.opponent;
-    gameOptions = data.options;
+    opponentName = data.opponentUsername;
+    yourUsername = data.yourUsername;
+    
+    gameOptions = {
+        matchCount: data.matchCount || 1,
+        competitive: data.competitive || false
+    };
 
-    playerNameEl.textContent = username;
+    playerNameEl.textContent = yourUsername;
     playerSymbolEl.textContent = mySymbol;
     playerSymbolEl.className = `player-symbol ${mySymbol.toLowerCase()}`;
     
@@ -159,17 +243,14 @@ function initGame(data) {
     opponentSymbolEl.textContent = opponentSymbol;
     opponentSymbolEl.className = `player-symbol ${opponentSymbol.toLowerCase()}`;
 
-    if (gameOptions) {
-        if (gameOptions.matchCount > 1) {
-            matchInfo.textContent = `Spiel 1 von ${gameOptions.matchCount}`;
-            if (gameOptions.competitive) {
-                scoreBoard.classList.remove('hidden');
-                yourScore.textContent = '0';
-                drawScore.textContent = '0';
-                opponentScore.textContent = '0';
-            }
+    if (gameOptions.matchCount > 1) {
+        matchInfo.textContent = `Spiel 1 von ${gameOptions.matchCount}`;
+        if (gameOptions.competitive) {
+            scoreBoard.classList.remove('hidden');
+            yourScore.textContent = '0';
+            drawScore.textContent = '0';
+            opponentScore.textContent = '0';
         } else {
-            matchInfo.textContent = '';
             scoreBoard.classList.add('hidden');
         }
     } else {
@@ -230,6 +311,88 @@ function highlightWinningLine(line) {
 }
 
 // Socket Events
+socket.on('searching', () => {
+    showScreen('searching');
+});
+
+socket.on('searchCancelled', () => {
+    showScreen('menu');
+});
+
+socket.on('lobbyJoined', (data) => {
+    currentLobbyId = data.lobbyId;
+    isPlayer1 = data.isPlayer1;
+    yourUsername = data.yourUsername;
+    
+    lobbyOpponentName.textContent = data.opponent;
+    
+    // Settings auf Standardwerte setzen
+    lobbyMatchCountSlider.value = data.settings.matchCount;
+    lobbyMatchCountValue.textContent = data.settings.matchCount;
+    
+    const modeRadio = document.querySelector(`input[name="lobbyGameMode"][value="${data.settings.competitive ? 'competitive' : 'normal'}"]`);
+    if (modeRadio) modeRadio.checked = true;
+    
+    // Ready Status zurücksetzen
+    isReady = false;
+    readyBtn.textContent = 'Bereit';
+    readyBtn.classList.remove('btn-secondary');
+    readyBtn.classList.add('btn-primary');
+    
+    player1NameReady.textContent = isPlayer1 ? yourUsername : data.opponent;
+    player2NameReady.textContent = isPlayer1 ? data.opponent : yourUsername;
+    player1ReadyStatus.textContent = 'Nicht bereit';
+    player1ReadyStatus.className = 'status-badge not-ready';
+    player2ReadyStatus.textContent = 'Nicht bereit';
+    player2ReadyStatus.className = 'status-badge not-ready';
+    
+    settingsUpdateNotice.classList.add('hidden');
+    
+    showScreen('lobby');
+});
+
+socket.on('settingsUpdated', (data) => {
+    // Settings aktualisieren
+    lobbyMatchCountSlider.value = data.settings.matchCount;
+    lobbyMatchCountValue.textContent = data.settings.matchCount;
+    
+    const modeRadio = document.querySelector(`input[name="lobbyGameMode"][value="${data.settings.competitive ? 'competitive' : 'normal'}"]`);
+    if (modeRadio) modeRadio.checked = true;
+    
+    // Benachrichtigung anzeigen
+    if (data.updatedBy !== username) {
+        settingsUpdater.textContent = data.updatedBy;
+        settingsUpdateNotice.classList.remove('hidden');
+        setTimeout(() => {
+            settingsUpdateNotice.classList.add('hidden');
+        }, 3000);
+    }
+    
+    // Ready-Status zurücksetzen
+    isReady = false;
+    readyBtn.textContent = 'Bereit';
+    readyBtn.classList.remove('btn-secondary');
+    readyBtn.classList.add('btn-primary');
+});
+
+socket.on('readyStatusUpdated', (data) => {
+    player1NameReady.textContent = data.player1Name;
+    player2NameReady.textContent = data.player2Name;
+    
+    player1ReadyStatus.textContent = data.player1Ready ? 'Bereit' : 'Nicht bereit';
+    player1ReadyStatus.className = data.player1Ready ? 'status-badge ready' : 'status-badge not-ready';
+    
+    player2ReadyStatus.textContent = data.player2Ready ? 'Bereit' : 'Nicht bereit';
+    player2ReadyStatus.className = data.player2Ready ? 'status-badge ready' : 'status-badge not-ready';
+});
+
+socket.on('opponentLeftLobby', () => {
+    alert('Dein Gegner hat die Lobby verlassen.');
+    currentLobbyId = null;
+    isReady = false;
+    showScreen('menu');
+});
+
 socket.on('gameStart', (data) => {
     initGame(data);
 });
@@ -248,25 +411,36 @@ socket.on('gameEnd', (data) => {
     }
 
     setTimeout(() => {
-        if (data.winner) {
-            if (data.winner === mySymbol) {
-                gameEndTitle.textContent = '🎉 Du hast gewonnen!';
-                gameEndMessage.textContent = 'Herzlichen Glückwunsch!';
-            } else {
-                gameEndTitle.textContent = '😔 Du hast verloren';
-                gameEndMessage.textContent = 'Nächstes Mal klappt es bestimmt!';
-            }
-        } else if (data.draw) {
-            gameEndTitle.textContent = '🤝 Unentschieden';
-            gameEndMessage.textContent = 'Gut gespielt!';
-        }
-
-        seriesScores.classList.add('hidden');
+        let title = '';
+        let subtitle = '';
+        let titleClass = '';
         
-        // Nur Modal zeigen wenn es kein Series-Spiel ist
-        if (!gameOptions || gameOptions.matchCount === 1) {
-            showModal();
+        if (data.draw) {
+            title = 'Unentschieden!';
+            subtitle = 'Gut gespielt!';
+            titleClass = 'draw';
+        } else if (data.winnerName === yourUsername) {
+            title = yourUsername + ' hat gewonnen!';
+            subtitle = 'Herzlichen Glückwunsch!';
+            titleClass = 'winner';
+        } else {
+            title = data.winnerName + ' hat gewonnen!';
+            subtitle = 'Besser beim nächsten Mal!';
+            titleClass = '';
         }
+        
+        gameEndTitle.textContent = title;
+        gameEndTitle.className = 'game-end-title ' + titleClass;
+        gameEndSubtitle.textContent = subtitle;
+        
+        // Wenn Serie, zeige continue Button
+        if (gameOptions.matchCount > 1) {
+            continueBtn.style.display = 'block';
+        } else {
+            continueBtn.style.display = 'none';
+        }
+        
+        showGameEndOverlay();
     }, 1500);
 });
 
@@ -279,7 +453,7 @@ socket.on('nextMatch', (data) => {
     opponentSymbolEl.textContent = opponentSymbol;
     opponentSymbolEl.className = `player-symbol ${opponentSymbol.toLowerCase()}`;
 
-    matchInfo.textContent = `Spiel ${data.matchNumber} von ${data.totalMatches}`;
+    matchInfo.textContent = `Spiel ${data.matchNumber} von ${gameOptions.matchCount}`;
     
     if (data.scores) {
         yourScore.textContent = data.scores.player1;
@@ -293,50 +467,48 @@ socket.on('nextMatch', (data) => {
         cell.innerHTML = '';
     });
 
+    hideGameEndOverlay();
     updateTurnIndicator('X');
 });
 
 socket.on('seriesEnd', (data) => {
     const scores = data.scores;
-    let finalMessage = '';
+    let title = '';
+    let message = '';
     
     if (scores.player1 > scores.player2) {
-        gameEndTitle.textContent = '🏆 Serie gewonnen!';
-        finalMessage = 'Du hast die Serie gewonnen!';
+        title = data.player1Name + ' hat die Serie gewonnen!';
     } else if (scores.player1 < scores.player2) {
-        gameEndTitle.textContent = '😔 Serie verloren';
-        finalMessage = 'Du hast die Serie verloren.';
+        title = data.player2Name + ' hat die Serie gewonnen!';
     } else {
-        gameEndTitle.textContent = '🤝 Serie unentschieden';
-        finalMessage = 'Die Serie endet unentschieden.';
+        title = 'Serie unentschieden!';
     }
 
-    gameEndMessage.textContent = finalMessage;
+    finalTitle.textContent = title;
+    finalMessage.textContent = '';
     
-    seriesScores.innerHTML = `
+    finalScores.innerHTML = `
         <h3>Endergebnis</h3>
-        <p>Du: ${scores.player1} Siege</p>
+        <p>${data.player1Name}: ${scores.player1} Siege</p>
         <p>Unentschieden: ${scores.draws}</p>
-        <p>Gegner: ${scores.player2} Siege</p>
+        <p>${data.player2Name}: ${scores.player2} Siege</p>
     `;
-    seriesScores.classList.remove('hidden');
+    finalScores.classList.remove('hidden');
 
-    showModal();
+    hideGameEndOverlay();
+    setTimeout(() => {
+        showModal();
+    }, 500);
 });
 
 socket.on('opponentDisconnected', () => {
-    gameEndTitle.textContent = '⚠️ Gegner getrennt';
-    gameEndMessage.textContent = 'Dein Gegner hat das Spiel verlassen.';
-    seriesScores.classList.add('hidden');
-    showModal();
-});
-
-socket.on('searching', () => {
-    showScreen('searching');
-});
-
-socket.on('searchCancelled', () => {
-    showScreen('menu');
+    finalTitle.textContent = 'Gegner getrennt';
+    finalMessage.textContent = 'Dein Gegner hat das Spiel verlassen.';
+    finalScores.classList.add('hidden');
+    hideGameEndOverlay();
+    setTimeout(() => {
+        showModal();
+    }, 300);
 });
 
 // Cell Click Events

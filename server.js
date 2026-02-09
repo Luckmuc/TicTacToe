@@ -4,7 +4,6 @@ const socketIO = require('socket.io');
 const path = require('path');
 const GameLogic = require('./gameLogic');
 const BotAI = require('./botAI');
-const Matchmaking = require('./matchmaking');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,12 +14,11 @@ const PORT = process.env.PORT || 6575;
 // Dienst für statische Dateien
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Matchmaking-Instanz
-const matchmaking = new Matchmaking();
-
-// Speichert aktive Spiele
+// Speichert aktive Spiele, Spieler und Lobbys
 const games = new Map();
 const players = new Map();
+const lobbies = new Map();
+const waitingPlayers = [];
 
 io.on('connection', (socket) => {
     console.log(`Neuer Spieler verbunden: ${socket.id}`);
@@ -53,15 +51,19 @@ io.on('connection', (socket) => {
             gameId: gameId,
             symbol: playerSymbol,
             mode: 'bot',
-            opponent: 'Bot'
+            opponent: 'Bot',
+            opponentUsername: 'Bot',
+            yourUsername: player.username,
+            matchCount: 1,
+            competitive: false
         });
 
         // Wenn Bot anfängt
-        if (game.botSymbol === 'X') {
+        if (game. botSymbol === 'X') {
             setTimeout(() => {
                 const botMove = BotAI.getMove(game.board, game.botSymbol, game.playerSymbol);
                 if (botMove !== null) {
-                    game.makeMove(botMove, game.botSymbol);
+                    game.makeMove(botMove, game.botSymbol, false);
                     socket.emit('moveMade', {
                         position: botMove,
                         symbol: game.botSymbol,
@@ -73,49 +75,56 @@ io.on('connection', (socket) => {
     });
 
     // Multiplayer-Suche
-    socket.on('searchMatch', (options) => {
+    socket.on('searchMatch', () => {
         const player = players.get(socket.id);
         if (!player) return;
 
-        socket.emit('searching');
-        
-        const match = matchmaking.findMatch(player, options);
-        
-        if (match) {
-            // Match gefunden
-            const gameId = `game_${Date.now()}`;
-            const game = new GameLogic(
-                gameId,
-                match.player1,
-                match.player2,
-                false,
-                match.options
-            );
-            games.set(gameId, game);
+        // Prüfen ob bereits ein wartender Spieler existiert
+        if (waitingPlayers.length > 0) {
+            // Gegner gefunden, Lobby erstellen
+            const opponent = waitingPlayers.shift();
+            const lobbyId = `lobby_${Date.now()}`;
 
-            // Zufällig X und O zuweisen
-            const p1Symbol = Math.random() < 0.5 ? 'X' : 'O';
-            const p2Symbol = p1Symbol === 'X' ? 'O' : 'X';
+            const lobby = {
+                id: lobbyId,
+                player1: opponent,
+                player2: player,
+                settings: {
+                    matchCount: 1,
+                    competitive: false
+                },
+                ready: {
+                    player1: false,
+                    player2: false
+                }
+            };
 
-            game.player1Symbol = p1Symbol;
-            game.player2Symbol = p2Symbol;
-            game.currentPlayer = 'X';
+            lobbies.set(lobbyId, lobby);
 
-            match.player1.socket.emit('gameStart', {
-                gameId: gameId,
-                symbol: p1Symbol,
-                mode: 'multiplayer',
-                opponent: match.player2.username,
-                options: match.options
+            // Beide Spieler zur Lobby hinzufügen
+            opponent.socket.join(lobbyId);
+            player.socket.join(lobbyId);
+
+            // Beide Spieler informieren
+            opponent.socket.emit('lobbyJoined', {
+                lobbyId: lobbyId,
+                opponent: player.username,
+                yourUsername: opponent.username,
+                settings: lobby.settings,
+                isPlayer1: true
             });
 
-            match.player2.socket.emit('gameStart', {
-                gameId: gameId,
-                symbol: p2Symbol,
-                mode: 'multiplayer',
-                opponent: match.player1.username,
-                options: match.options
+            player.socket.emit('lobbyJoined', {
+                lobbyId: lobbyId,
+                opponent: opponent.username,
+                yourUsername: player.username,
+                settings: lobby.settings,
+                isPlayer1: false
             });
+        } else {
+            // Kein Gegner gefunden, in Queue einfügen
+            waitingPlayers.push(player);
+            socket.emit('searching');
         }
     });
 
@@ -123,9 +132,122 @@ io.on('connection', (socket) => {
     socket.on('cancelSearch', () => {
         const player = players.get(socket.id);
         if (player) {
-            matchmaking.removePlayer(player);
+            const index = waitingPlayers.findIndex(p => p.id === socket.id);
+            if (index !== -1) {
+                waitingPlayers.splice(index, 1);
+            }
             socket.emit('searchCancelled');
         }
+    });
+
+    // Settings in Lobby ändern
+    socket.on('updateSettings', (data) => {
+        const lobby = lobbies.get(data.lobbyId);
+        if (!lobby) return;
+
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        // Prüfen ob Spieler in dieser Lobby ist
+        if (lobby.player1.id !== socket.id && lobby.player2.id !== socket.id) return;
+
+        // Settings aktualisieren
+        lobby.settings = data.settings;
+
+        // Ready-Status zurücksetzen bei Änderung
+        lobby.ready.player1 = false;
+        lobby.ready.player2 = false;
+
+        // An beide Spieler senden
+        io.to(data.lobbyId).emit('settingsUpdated', {
+            settings: lobby.settings,
+            updatedBy: player.username
+        });
+    });
+
+    // Ready Status in Lobby
+    socket.on('setReady', (data) => {
+        const lobby = lobbies.get(data.lobbyId);
+        if (!lobby) return;
+
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        // Ready-Status setzen
+        if (lobby.player1.id === socket.id) {
+            lobby.ready.player1 = data.ready;
+        } else if (lobby.player2.id === socket.id) {
+            lobby.ready.player2 = data.ready;
+        }
+
+        // An beide Spieler senden
+        io.to(data.lobbyId).emit('readyStatusUpdated', {
+            player1Ready: lobby.ready.player1,
+            player2Ready: lobby.ready.player2,
+            player1Name: lobby.player1.username,
+            player2Name: lobby.player2.username
+        });
+
+        // Wenn beide ready sind, Spiel starten
+        if (lobby.ready.player1 && lobby.ready.player2) {
+            startGame(lobby);
+        }
+    });
+
+    function startGame(lobby) {
+        const gameId = `game_${Date.now()}`;
+        const game = new GameLogic(
+            gameId,
+            lobby.player1,
+            lobby.player2,
+            false,
+            lobby.settings
+        );
+        games.set(gameId, game);
+
+        // Zufällig X und O zuweisen
+        const p1Symbol = Math.random() < 0.5 ? 'X' : 'O';
+        const p2Symbol = p1Symbol === 'X' ? 'O' : 'X';
+
+        game.player1Symbol = p1Symbol;
+        game.player2Symbol = p2Symbol;
+        game.currentPlayer = 'X';
+
+        lobby.player1.socket.emit('gameStart', {
+            gameId: gameId,
+            symbol: p1Symbol,
+            mode: 'multiplayer',
+            opponent: lobby.player2.username,
+            opponentUsername: lobby.player2.username,
+            yourUsername: lobby.player1.username,
+            matchCount: lobby.settings.matchCount,
+            competitive: lobby.settings.competitive
+        });
+
+        lobby.player2.socket.emit('gameStart', {
+            gameId: gameId,
+            symbol: p2Symbol,
+            mode: 'multiplayer',
+            opponent: lobby.player1.username,
+            opponentUsername: lobby.player1.username,
+            yourUsername: lobby.player2.username,
+            matchCount: lobby.settings.matchCount,
+            competitive: lobby.settings.competitive
+        });
+
+        // Lobby entfernen
+        lobbies.delete(lobby.id);
+    }
+
+    // Lobby verlassen
+    socket.on('leaveLobby', (data) => {
+        const lobby = lobbies.get(data.lobbyId);
+        if (!lobby) return;
+
+        const opponent = lobby.player1.id === socket.id ? lobby.player2 : lobby.player1;
+        opponent.socket.emit('opponentLeftLobby');
+
+        lobbies.delete(data.lobbyId);
     });
 
     // Zug machen
@@ -138,17 +260,25 @@ io.on('connection', (socket) => {
 
         // Prüfen ob Spieler an der Reihe ist
         let playerSymbol;
+        let isPlayer1 = false;
         if (game.isBot) {
             playerSymbol = game.playerSymbol;
+            isPlayer1 = true;
         } else {
-            playerSymbol = game.player1.id === socket.id ? game.player1Symbol : game.player2Symbol;
+            if (game.player1.id === socket.id) {
+                playerSymbol = game.player1Symbol;
+                isPlayer1 = true;
+            } else {
+                playerSymbol = game.player2Symbol;
+                isPlayer1 = false;
+            }
         }
 
         if (game.currentPlayer !== playerSymbol) {
             return; // Nicht an der Reihe
         }
 
-        const result = game.makeMove(data.position, playerSymbol);
+        const result = game.makeMove(data.position, playerSymbol, isPlayer1);
         
         if (result.valid) {
             // Zug an alle Spieler senden
@@ -161,10 +291,12 @@ io.on('connection', (socket) => {
 
                 // Prüfen auf Spielende
                 if (result.winner || result.draw) {
+                    const winnerName = result.winner === game.playerSymbol ? player.username : 'Bot';
                     socket.emit('gameEnd', {
                         winner: result.winner,
                         draw: result.draw,
-                        winningLine: result.winningLine
+                        winningLine: result.winningLine,
+                        winnerName: result.draw ? null : winnerName
                     });
                     games.delete(data.gameId);
                     return;
@@ -174,7 +306,7 @@ io.on('connection', (socket) => {
                 setTimeout(() => {
                     const botMove = BotAI.getMove(game.board, game.botSymbol, game.playerSymbol);
                     if (botMove !== null) {
-                        const botResult = game.makeMove(botMove, game.botSymbol);
+                        const botResult = game.makeMove(botMove, game.botSymbol, false);
                         socket.emit('moveMade', {
                             position: botMove,
                             symbol: game.botSymbol,
@@ -182,10 +314,12 @@ io.on('connection', (socket) => {
                         });
 
                         if (botResult.winner || botResult.draw) {
+                            const winnerName = botResult.winner === game.playerSymbol ? player.username : 'Bot';
                             socket.emit('gameEnd', {
                                 winner: botResult.winner,
                                 draw: botResult.draw,
-                                winningLine: botResult.winningLine
+                                winningLine: botResult.winningLine,
+                                winnerName: botResult.draw ? null : winnerName
                             });
                             games.delete(data.gameId);
                         }
@@ -205,10 +339,16 @@ io.on('connection', (socket) => {
                 });
 
                 if (result.winner || result.draw) {
+                    let winnerName = null;
+                    if (!result.draw) {
+                        winnerName = result.winner === game.player1Symbol ? game.player1.username : game.player2.username;
+                    }
+
                     const endData = {
                         winner: result.winner,
                         draw: result.draw,
-                        winningLine: result.winningLine
+                        winningLine: result.winningLine,
+                        winnerName: winnerName
                     };
 
                     game.player1.socket.emit('gameEnd', endData);
@@ -247,10 +387,14 @@ io.on('connection', (socket) => {
                             // Serie beendet
                             setTimeout(() => {
                                 game.player1.socket.emit('seriesEnd', {
-                                    scores: game.scores
+                                    scores: game.scores,
+                                    player1Name: game.player1.username,
+                                    player2Name: game.player2.username
                                 });
                                 game.player2.socket.emit('seriesEnd', {
-                                    scores: game.scores
+                                    scores: game.scores,
+                                    player1Name: game.player1.username,
+                                    player2Name: game.player2.username
                                 });
                                 games.delete(data.gameId);
                             }, 3000);
@@ -269,7 +413,20 @@ io.on('connection', (socket) => {
         
         const player = players.get(socket.id);
         if (player) {
-            matchmaking.removePlayer(player);
+            // Aus Warteliste entfernen
+            const index = waitingPlayers.findIndex(p => p.id === socket.id);
+            if (index !== -1) {
+                waitingPlayers.splice(index, 1);
+            }
+
+            // Aus Lobby entfernen
+            lobbies.forEach((lobby, lobbyId) => {
+                if (lobby.player1.id === socket.id || lobby.player2.id === socket.id) {
+                    const opponent = lobby.player1.id === socket.id ? lobby.player2 : lobby.player1;
+                    opponent.socket.emit('opponentLeftLobby');
+                    lobbies.delete(lobbyId);
+                }
+            });
         }
 
         // Spiel beenden wenn Spieler disconnected

@@ -155,11 +155,6 @@ input[type="text"]:focus {
     margin: 10px 0;
 }
 
-.btn-icon {
-    font-size: 1.5rem;
-    margin-right: 10px;
-}
-
 .welcome {
     text-align: center;
     font-size: 1.5rem;
@@ -508,6 +503,170 @@ input[type="range"] {
 .series-scores p {
     margin: 0.5rem 0;
     font-size: 1rem;
+}
+
+/* Lobby Screen Styles */
+.info-text {
+    text-align: center;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.lobby-opponent {
+    text-align: center;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    padding: 10px;
+    background: var(--bg-color);
+    border-radius: 8px;
+}
+
+.lobby-opponent span {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+.settings-notice {
+    padding: 10px;
+    background: var(--warning-color);
+    color: white;
+    border-radius: 8px;
+    text-align: center;
+    margin: 1rem 0;
+    animation: slideIn 0.3s ease-out;
+}
+
+.settings-notice.hidden {
+    display: none;
+}
+
+.settings-notice span {
+    font-weight: bold;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.ready-status {
+    background: var(--bg-color);
+    padding: 1rem;
+    border-radius: 10px;
+    margin: 1.5rem 0;
+}
+
+.ready-player {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0.5rem 0;
+    padding: 10px;
+    background: var(--card-bg);
+    border-radius: 8px;
+}
+
+.ready-player span:first-child {
+    font-weight: 600;
+}
+
+.status-badge {
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.status-badge.ready {
+    background: var(--success-color);
+    color: white;
+}
+
+.status-badge.not-ready {
+    background: var(--border-color);
+    color: var(--text-secondary);
+}
+
+/* Game End Overlay */
+.game-end-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.game-end-overlay.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+.game-end-content {
+    text-align: center;
+    padding: 3rem;
+    animation: zoomIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.game-end-title {
+    font-size: 4rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: textGlow 1s ease-in-out;
+}
+
+@keyframes textGlow {
+    0%, 100% {
+        filter: brightness(1);
+    }
+    50% {
+        filter: brightness(1.5);
+    }
+}
+
+.game-end-title.winner {
+    background: linear-gradient(135deg, var(--success-color), #38a169);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.game-end-title.draw {
+    background: linear-gradient(135deg, var(--warning-color), #dd6b20);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.game-end-subtitle {
+    font-size: 1.5rem;
+    color: var(--text-color);
+    margin-bottom: 2rem;
 }
 
 /* Responsive */

@@ -26,11 +26,9 @@
             <div class="welcome">Willkommen, <span id="usernameDisplay"></span>!</div>
             <div class="menu-buttons">
                 <button id="playBotBtn" class="btn btn-primary btn-large">
-                    <span class="btn-icon">🤖</span>
                     Gegen Bot spielen
                 </button>
                 <button id="playMultiplayerBtn" class="btn btn-secondary btn-large">
-                    <span class="btn-icon">👥</span>
                     Mehrspieler
                 </button>
             </div>
@@ -40,33 +38,65 @@
     <!-- Multiplayer Options Screen -->
     <div id="optionsScreen" class="screen">
         <div class="container">
-            <h1 class="title">Spieloptionen</h1>
+            <h1 class="title">Mehrspieler</h1>
+            <div class="card">
+                <h2>Gegner suchen</h2>
+                <p class="info-text">Finde einen Gegner und konfiguriert gemeinsam das Spiel!</p>
+                
+                <div class="button-group">
+                    <button id="startSearchBtn" class="btn btn-primary">Gegner suchen</button>
+                    <button id="backToMenuBtn" class="btn btn-secondary">Zurück</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lobby Screen (beide Spieler zusammen) -->
+    <div id="lobbyScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Spiellobby</h1>
             <div class="card">
                 <h2>Spieleinstellungen</h2>
+                <p class="lobby-opponent">Gegner: <span id="lobbyOpponentName"></span></p>
                 
                 <div class="option-group">
-                    <label for="matchCount">Anzahl der Spiele:</label>
-                    <input type="range" id="matchCount" min="1" max="50" value="1">
-                    <span id="matchCountValue">1</span>
+                    <label for="lobbyMatchCount">Anzahl der Spiele:</label>
+                    <input type="range" id="lobbyMatchCount" min="1" max="50" value="1">
+                    <span id="lobbyMatchCountValue">1</span>
                 </div>
 
                 <div class="option-group">
                     <label>Spielmodus:</label>
                     <div class="radio-group">
                         <label class="radio-label">
-                            <input type="radio" name="gameMode" value="normal" checked>
+                            <input type="radio" name="lobbyGameMode" value="normal" checked>
                             <span>Normal (ohne Punkte)</span>
                         </label>
                         <label class="radio-label">
-                            <input type="radio" name="gameMode" value="competitive">
+                            <input type="radio" name="lobbyGameMode" value="competitive">
                             <span>Competitive (mit Punkten)</span>
                         </label>
                     </div>
                 </div>
 
+                <div id="settingsUpdateNotice" class="settings-notice hidden">
+                    Einstellungen wurden von <span id="settingsUpdater"></span> geändert
+                </div>
+
+                <div class="ready-status">
+                    <div class="ready-player">
+                        <span id="player1NameReady"></span>: 
+                        <span id="player1ReadyStatus" class="status-badge">Nicht bereit</span>
+                    </div>
+                    <div class="ready-player">
+                        <span id="player2NameReady"></span>: 
+                        <span id="player2ReadyStatus" class="status-badge">Nicht bereit</span>
+                    </div>
+                </div>
+
                 <div class="button-group">
-                    <button id="startSearchBtn" class="btn btn-primary">Gegner suchen</button>
-                    <button id="backToMenuBtn" class="btn btn-secondary">Zurück</button>
+                    <button id="readyBtn" class="btn btn-primary">Bereit</button>
+                    <button id="leaveLobbyBtn" class="btn btn-secondary">Lobby verlassen</button>
                 </div>
             </div>
         </div>
@@ -135,12 +165,22 @@
         </div>
     </div>
 
-    <!-- Game End Modal -->
+    <!-- Game End Overlay -->
+    <div id="gameEndOverlay" class="game-end-overlay">
+        <div class="game-end-content">
+            <h1 id="gameEndTitle" class="game-end-title"></h1>
+            <p id="gameEndSubtitle" class="game-end-subtitle"></p>
+            <div id="seriesScores" class="series-scores hidden"></div>
+            <button id="continueBtn" class="btn btn-primary btn-large" style="display:none;">Weiter</button>
+        </div>
+    </div>
+
+    <!-- Final Modal -->
     <div id="gameEndModal" class="modal">
         <div class="modal-content">
-            <h2 id="gameEndTitle"></h2>
-            <p id="gameEndMessage"></p>
-            <div id="seriesScores" class="series-scores hidden"></div>
+            <h2 id="finalTitle"></h2>
+            <p id="finalMessage"></p>
+            <div id="finalScores" class="series-scores hidden"></div>
             <button id="backToMenuFromGame" class="btn btn-primary">Zurück zum Menü</button>
         </div>
     </div>
