@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
         });
 
         // Wenn Bot anfängt
-        if (game. botSymbol === 'X') {
+        if (game.botSymbol === 'X') {
             setTimeout(() => {
                 const botMove = BotAI.getMove(game.board, game.botSymbol, game.playerSymbol);
                 if (botMove !== null) {

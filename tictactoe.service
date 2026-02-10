@@ -15,5 +15,5 @@ SyslogIdentifier=tictactoe
 Environment=NODE_ENV=production
 Environment=PORT=6575
 
-[Install]
+[Install]git
 WantedBy=multi-user.target

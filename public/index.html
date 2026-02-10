@@ -2,7 +2,9 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Tic Tac Toe Online</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -171,7 +173,10 @@
             <h1 id="gameEndTitle" class="game-end-title"></h1>
             <p id="gameEndSubtitle" class="game-end-subtitle"></p>
             <div id="seriesScores" class="series-scores hidden"></div>
-            <button id="continueBtn" class="btn btn-primary btn-large" style="display:none;">Weiter</button>
+            <div class="button-group-overlay">
+                <button id="continueBtn" class="btn btn-primary btn-large" style="display:none;">Weiter</button>
+                <button id="backToMenuFromOverlay" class="btn btn-secondary">Zurück zum Menü</button>
+            </div>
         </div>
     </div>
 

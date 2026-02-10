@@ -26,12 +26,15 @@ body {
     align-items: center;
     justify-content: center;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .screen {
     display: none;
     width: 100%;
     animation: fadeIn 0.3s ease-in;
+    will-change: opacity, transform;
 }
 
 .screen.active {
@@ -375,11 +378,16 @@ input[type="range"] {
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 
-.cell:hover:not(.filled) {
-    background: var(--border-color);
-    transform: scale(1.05);
+@media (hover: hover) and (pointer: fine) {
+    .cell:hover:not(.filled) {
+        background: var(--border-color);
+        transform: scale(1.05);
+    }
 }
 
 .cell.filled {
@@ -389,6 +397,7 @@ input[type="range"] {
 .cell.winner {
     animation: winnerCell 0.6s ease-in-out;
     background: linear-gradient(135deg, var(--success-color), #38a169);
+    will-change: transform;
 }
 
 @keyframes winnerCell {
@@ -402,6 +411,7 @@ input[type="range"] {
 
 .cell-content {
     animation: symbolPop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    will-change: transform, opacity;
 }
 
 @keyframes symbolPop {
@@ -616,6 +626,7 @@ input[type="range"] {
     text-align: center;
     padding: 3rem;
     animation: zoomIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    will-change: transform, opacity;
 }
 
 @keyframes zoomIn {
@@ -638,6 +649,7 @@ input[type="range"] {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     animation: textGlow 1s ease-in-out;
+    will-change: filter;
 }
 
 @keyframes textGlow {
@@ -669,7 +681,49 @@ input[type="range"] {
     margin-bottom: 2rem;
 }
 
+.button-group-overlay {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.button-group-overlay .btn {
+    min-width: 200px;
+}
+
 /* Responsive */
+@media (max-width: 1024px) and (min-width: 769px) {
+    /* iPad Landscape und Portrait */
+    .title {
+        font-size: 2.5rem;
+    }
+
+    .board {
+        grid-template-columns: repeat(3, 110px);
+        grid-template-rows: repeat(3, 110px);
+        gap: 12px;
+    }
+
+    .cell {
+        font-size: 3rem;
+        border-radius: 12px;
+    }
+
+    .container {
+        max-width: 700px;
+    }
+
+    .game-end-title {
+        font-size: 3.5rem;
+    }
+
+    .btn-large {
+        padding: 18px 28px;
+        font-size: 1.1rem;
+    }
+}
+
 @media (max-width: 768px) {
     .title {
         font-size: 2rem;
@@ -689,6 +743,19 @@ input[type="range"] {
         flex-direction: column;
         gap: 10px;
     }
+
+    .game-end-title {
+        font-size: 2.5rem;
+    }
+
+    .button-group-overlay {
+        flex-direction: column;
+    }
+
+    .button-group-overlay .btn {
+        width: 100%;
+        min-width: auto;
+    }
 }
 
 @media (max-width: 480px) {
@@ -700,5 +767,34 @@ input[type="range"] {
 
     .cell {
         font-size: 1.5rem;
+    }
+
+    .game-end-title {
+        font-size: 2rem;
+    }
+
+    .game-end-subtitle {
+        font-size: 1.2rem;
+    }
+}
+
+/* Touch-Verbesserungen für Tablets */
+@media (hover: none) and (pointer: coarse) {
+    .cell {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .btn {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .cell:active {
+        transform: scale(0.95);
+    }
+
+    .btn:active {
+        transform: scale(0.98);
     }
 }

@@ -66,7 +66,9 @@ const leaveGameBtn = document.getElementById('leaveGameBtn');
 const gameEndOverlay = document.getElementById('gameEndOverlay');
 const gameEndTitle = document.getElementById('gameEndTitle');
 const gameEndSubtitle = document.getElementById('gameEndSubtitle');
+const seriesScoresOverlay = document.getElementById('seriesScores');
 const continueBtn = document.getElementById('continueBtn');
+const backToMenuFromOverlay = document.getElementById('backToMenuFromOverlay');
 const gameEndModal = document.getElementById('gameEndModal');
 const finalTitle = document.getElementById('finalTitle');
 const finalMessage = document.getElementById('finalMessage');
@@ -208,6 +210,12 @@ continueBtn.addEventListener('click', () => {
     hideGameEndOverlay();
 });
 
+backToMenuFromOverlay.addEventListener('click', () => {
+    hideGameEndOverlay();
+    resetGame();
+    showScreen('menu');
+});
+
 // Game Logic
 function resetGame() {
     currentGameId = null;
@@ -294,12 +302,19 @@ function makeMove(position) {
 
 function renderMove(position, symbol) {
     const cell = cells[position];
+    if (cell.classList.contains('filled')) return; // Bereits gefüllt
+    
     cell.classList.add('filled');
+    cell.innerHTML = ''; // Vorherigen Inhalt löschen
     
     const content = document.createElement('div');
     content.className = `cell-content ${symbol.toLowerCase()}`;
     content.textContent = symbol;
-    cell.appendChild(content);
+    
+    // Kleine Verzögerung für bessere Animation
+    requestAnimationFrame(() => {
+        cell.appendChild(content);
+    });
 }
 
 function highlightWinningLine(line) {
@@ -394,6 +409,10 @@ socket.on('opponentLeftLobby', () => {
 });
 
 socket.on('gameStart', (data) => {
+    // Username setzen falls nicht schon gesetzt
+    if (!yourUsername) {
+        yourUsername = username;
+    }
     initGame(data);
 });
 
@@ -433,8 +452,8 @@ socket.on('gameEnd', (data) => {
         gameEndTitle.className = 'game-end-title ' + titleClass;
         gameEndSubtitle.textContent = subtitle;
         
-        // Wenn Serie, zeige continue Button
-        if (gameOptions.matchCount > 1) {
+        // Continue Button nur bei Serie anzeigen
+        if (gameOptions && gameOptions.matchCount > 1) {
             continueBtn.style.display = 'block';
         } else {
             continueBtn.style.display = 'none';
