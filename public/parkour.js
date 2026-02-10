@@ -43,7 +43,7 @@ class Player {
         this.keys = {};
     }
 
-    update(platforms) {
+    update(platforms, otherPlayers = []) {
         // Gravity
         this.velocityY += GRAVITY;
         if (this.velocityY > MAX_FALL_SPEED) {
@@ -80,6 +80,33 @@ class Player {
                         this.x = platform.x - this.width;
                     } else if (this.velocityX < 0) {
                         this.x = platform.x + platform.width;
+                    }
+                }
+            }
+        });
+
+        // Collision with other players (can stand on each other)
+        otherPlayers.forEach(player => {
+            if (player && player.id !== this.id) {
+                if (this.checkCollision(player)) {
+                    // Bottom collision - can stand on other player
+                    if (this.velocityY > 0 && this.y + this.height - this.velocityY <= player.y) {
+                        this.y = player.y - this.height;
+                        this.velocityY = 0;
+                        this.onGround = true;
+                    }
+                    // Top collision
+                    else if (this.velocityY < 0 && this.y - this.velocityY >= player.y + player.height) {
+                        this.y = player.y + player.height;
+                        this.velocityY = 0;
+                    }
+                    // Side collisions
+                    else {
+                        if (this.velocityX > 0) {
+                            this.x = player.x - this.width;
+                        } else if (this.velocityX < 0) {
+                            this.x = player.x + player.width;
+                        }
                     }
                 }
             }
@@ -127,7 +154,7 @@ class Player {
     }
 }
 
-// Level platforms
+// Level platforms - 10 verschiedene Levels
 const levels = {
     1: [
         { x: 0, y: 570, width: 400, height: 30 },
@@ -160,6 +187,90 @@ const levels = {
         { x: 450, y: 170, width: 100, height: 30 },
         { x: 250, y: 70, width: 100, height: 30 },
         { x: 950, y: 100, width: 250, height: 30, finish: true }
+    ],
+    4: [
+        { x: 0, y: 570, width: 100, height: 30 },
+        { x: 200, y: 500, width: 80, height: 30 },
+        { x: 380, y: 430, width: 80, height: 30 },
+        { x: 560, y: 360, width: 80, height: 30 },
+        { x: 740, y: 290, width: 80, height: 30 },
+        { x: 920, y: 220, width: 80, height: 30 },
+        { x: 740, y: 150, width: 80, height: 30 },
+        { x: 560, y: 80, width: 80, height: 30 },
+        { x: 900, y: 80, width: 300, height: 30, finish: true }
+    ],
+    5: [
+        { x: 0, y: 570, width: 300, height: 30 },
+        { x: 400, y: 470, width: 100, height: 30 },
+        { x: 600, y: 370, width: 100, height: 30 },
+        { x: 350, y: 270, width: 100, height: 30 },
+        { x: 550, y: 170, width: 100, height: 30 },
+        { x: 750, y: 270, width: 100, height: 30 },
+        { x: 950, y: 370, width: 100, height: 30 },
+        { x: 850, y: 100, width: 350, height: 30, finish: true }
+    ],
+    6: [
+        { x: 0, y: 570, width: 150, height: 30 },
+        { x: 250, y: 520, width: 80, height: 30 },
+        { x: 430, y: 470, width: 80, height: 30 },
+        { x: 610, y: 420, width: 80, height: 30 },
+        { x: 790, y: 370, width: 80, height: 30 },
+        { x: 970, y: 320, width: 80, height: 30 },
+        { x: 790, y: 270, width: 80, height: 30 },
+        { x: 610, y: 220, width: 80, height: 30 },
+        { x: 430, y: 170, width: 80, height: 30 },
+        { x: 250, y: 120, width: 80, height: 30 },
+        { x: 900, y: 50, width: 300, height: 30, finish: true }
+    ],
+    7: [
+        { x: 0, y: 570, width: 200, height: 30 },
+        { x: 300, y: 470, width: 150, height: 30 },
+        { x: 150, y: 370, width: 150, height: 30 },
+        { x: 400, y: 270, width: 150, height: 30 },
+        { x: 250, y: 170, width: 150, height: 30 },
+        { x: 500, y: 70, width: 150, height: 30 },
+        { x: 750, y: 170, width: 150, height: 30 },
+        { x: 900, y: 270, width: 150, height: 30 },
+        { x: 1000, y: 100, width: 200, height: 30, finish: true }
+    ],
+    8: [
+        { x: 0, y: 570, width: 100, height: 30 },
+        { x: 180, y: 520, width: 70, height: 30 },
+        { x: 330, y: 470, width: 70, height: 30 },
+        { x: 480, y: 420, width: 70, height: 30 },
+        { x: 630, y: 370, width: 70, height: 30 },
+        { x: 780, y: 320, width: 70, height: 30 },
+        { x: 930, y: 270, width: 70, height: 30 },
+        { x: 1080, y: 220, width: 70, height: 30 },
+        { x: 930, y: 170, width: 70, height: 30 },
+        { x: 780, y: 120, width: 70, height: 30 },
+        { x: 630, y: 70, width: 70, height: 30 },
+        { x: 850, y: 50, width: 350, height: 30, finish: true }
+    ],
+    9: [
+        { x: 0, y: 570, width: 250, height: 30 },
+        { x: 350, y: 500, width: 100, height: 30 },
+        { x: 550, y: 430, width: 100, height: 30 },
+        { x: 350, y: 360, width: 100, height: 30 },
+        { x: 150, y: 290, width: 100, height: 30 },
+        { x: 350, y: 220, width: 100, height: 30 },
+        { x: 550, y: 150, width: 100, height: 30 },
+        { x: 750, y: 220, width: 100, height: 30 },
+        { x: 950, y: 290, width: 100, height: 30 },
+        { x: 850, y: 100, width: 350, height: 30, finish: true }
+    ],
+    10: [
+        { x: 0, y: 570, width: 120, height: 30 },
+        { x: 180, y: 510, width: 80, height: 30 },
+        { x: 330, y: 450, width: 80, height: 30 },
+        { x: 480, y: 390, width: 80, height: 30 },
+        { x: 630, y: 330, width: 80, height: 30 },
+        { x: 780, y: 270, width: 80, height: 30 },
+        { x: 930, y: 210, width: 80, height: 30 },
+        { x: 1080, y: 150, width: 80, height: 30 },
+        { x: 930, y: 90, width: 80, height: 30 },
+        { x: 780, y: 30, width: 80, height: 30 },
+        { x: 950, y: 30, width: 250, height: 30, finish: true }
     ]
 };
 
@@ -229,7 +340,8 @@ function gameLoop() {
     
     // Update and draw players
     if (parkourPlayers[myPlayerId]) {
-        parkourPlayers[myPlayerId].update(currentPlatforms);
+        const otherPlayers = [parkourPlayers[teammateId]].filter(p => p);
+        parkourPlayers[myPlayerId].update(currentPlatforms, otherPlayers);
         parkourPlayers[myPlayerId].draw(ctx, true);
         
         // Send position to server
@@ -243,7 +355,8 @@ function gameLoop() {
     }
     
     if (parkourPlayers[teammateId]) {
-        parkourPlayers[teammateId].update(currentPlatforms);
+        const otherPlayers = [parkourPlayers[myPlayerId]].filter(p => p);
+        parkourPlayers[teammateId].update(currentPlatforms, otherPlayers);
         parkourPlayers[teammateId].draw(ctx, false);
     }
     
@@ -327,6 +440,50 @@ if (cancelParkourSearchBtn) {
     });
 }
 
+// Touch Controls
+const touchLeftBtn = document.getElementById('touchLeftBtn');
+const touchRightBtn = document.getElementById('touchRightBtn');
+const touchJumpBtn = document.getElementById('touchJumpBtn');
+
+if (touchLeftBtn) {
+    touchLeftBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (parkourPlayers[myPlayerId]) {
+            parkourPlayers[myPlayerId].keys.left = true;
+        }
+    });
+    touchLeftBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (parkourPlayers[myPlayerId]) {
+            parkourPlayers[myPlayerId].keys.left = false;
+        }
+    });
+}
+
+if (touchRightBtn) {
+    touchRightBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (parkourPlayers[myPlayerId]) {
+            parkourPlayers[myPlayerId].keys.right = true;
+        }
+    });
+    touchRightBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (parkourPlayers[myPlayerId]) {
+            parkourPlayers[myPlayerId].keys.right = false;
+        }
+    });
+}
+
+if (touchJumpBtn) {
+    touchJumpBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (parkourPlayers[myPlayerId]) {
+            parkourPlayers[myPlayerId].jump();
+        }
+    });
+}
+
 if (leaveParkourBtn) {
     leaveParkourBtn.addEventListener('click', () => {
         if (animationId) {
@@ -372,9 +529,9 @@ socket.on('parkourGameStart', (data) => {
     parkourPlayer1El.textContent = data.player1Name;
     parkourPlayer2El.textContent = data.player2Name;
     
-    // Initialize players
-    parkourPlayers[data.player1Id] = new Player(data.player1Id, 50, 400, '#667eea');
-    parkourPlayers[data.player2Id] = new Player(data.player2Id, 100, 400, '#f56565');
+    // Initialize players with green and blue colors
+    parkourPlayers[data.player1Id] = new Player(data.player1Id, 50, 400, '#48bb78'); // Green
+    parkourPlayers[data.player2Id] = new Player(data.player2Id, 100, 400, '#667eea'); // Blue
     
     setupCanvas();
     initLevel(1);

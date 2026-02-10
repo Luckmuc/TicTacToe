@@ -422,8 +422,10 @@ io.on('connection', (socket) => {
         // Add to waiting list
         waitingParkourPlayers.push(socket.id);
         socket.emit('parkourSearching');
+        
+        console.log(`Parkour search: ${player.username}, Queue size: ${waitingParkourPlayers.length}`);
 
-        // Try to match
+        // Try to match immediately if 2+ players
         if (waitingParkourPlayers.length >= 2) {
             const player1Id = waitingParkourPlayers.shift();
             const player2Id = waitingParkourPlayers.shift();
