@@ -414,19 +414,30 @@ io.on('connection', (socket) => {
     // Parkour Game - Search for match
     socket.on('searchParkour', () => {
         const player = players.get(socket.id);
-        if (!player) return;
+        console.log(`[Parkour] Search request from ${socket.id}, player exists: ${!!player}`);
+        
+        if (!player) {
+            console.log(`[Parkour] Player not registered: ${socket.id}`);
+            return;
+        }
 
         // Check if already waiting
-        if (waitingParkourPlayers.includes(socket.id)) return;
+        if (waitingParkourPlayers.includes(socket.id)) {
+            console.log(`[Parkour] Player already in queue: ${player.username}`);
+            return;
+        }
 
         // Add to waiting list
         waitingParkourPlayers.push(socket.id);
         socket.emit('parkourSearching');
         
-        console.log(`Parkour search: ${player.username}, Queue size: ${waitingParkourPlayers.length}`);
+        console.log(`[Parkour] ${player.username} added to queue. Queue size: ${waitingParkourPlayers.length}`);
+        console.log(`[Parkour] Current queue: ${waitingParkourPlayers.map(id => players.get(id)?.username || id).join(', ')}`);
 
         // Try to match immediately if 2+ players
         if (waitingParkourPlayers.length >= 2) {
+            console.log(`[Parkour] Attempting to match 2 players...`);
+            
             const player1Id = waitingParkourPlayers.shift();
             const player2Id = waitingParkourPlayers.shift();
 
@@ -434,6 +445,7 @@ io.on('connection', (socket) => {
             const player2 = players.get(player2Id);
 
             if (!player1 || !player2) {
+                console.log(`[Parkour] Match failed - player disconnected`);
                 // One player disconnected, add remaining back to queue
                 if (player1) waitingParkourPlayers.unshift(player1Id);
                 if (player2) waitingParkourPlayers.unshift(player2Id);
@@ -450,26 +462,32 @@ io.on('connection', (socket) => {
                 startTime: Date.now()
             });
 
-            // Notify both players
-            player1.socket.emit('parkourGameStart', {
+            console.log(`[Parkour] Game created: ${gameId}`);
+            console.log(`[Parkour] Players: ${player1.username} (${player1Id}) vs ${player2.username} (${player2Id})`);
+
+            // Notify both players using io.to()
+            const gameData1 = {
                 gameId: gameId,
                 player1Id: player1Id,
                 player2Id: player2Id,
                 player1Name: player1.username,
                 player2Name: player2.username,
                 teammate: player2Id
-            });
+            };
 
-            player2.socket.emit('parkourGameStart', {
+            const gameData2 = {
                 gameId: gameId,
                 player1Id: player1Id,
                 player2Id: player2Id,
                 player1Name: player1.username,
                 player2Name: player2.username,
                 teammate: player1Id
-            });
+            };
 
-            console.log(`Parkour game started: ${gameId}`);
+            io.to(player1Id).emit('parkourGameStart', gameData1);
+            io.to(player2Id).emit('parkourGameStart', gameData2);
+
+            console.log(`[Parkour] Game start events sent to both players`);
         }
     });
 
@@ -488,16 +506,13 @@ io.on('connection', (socket) => {
 
         // Send to opponent
         const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
-        const opponent = players.get(opponentId);
-        if (opponent) {
-            opponent.socket.emit('parkourPlayerMove', {
-                playerId: socket.id,
-                x: data.x,
-                y: data.y,
-                velocityX: data.velocityX,
-                velocityY: data.velocityY
-            });
-        }
+        io.to(opponentId).emit('parkourPlayerMove', {
+            playerId: socket.id,
+            x: data.x,
+            y: data.y,
+            velocityX: data.velocityX,
+            velocityY: data.velocityY
+        });
     });
 
     // Level complete
@@ -508,15 +523,18 @@ io.on('connection', (socket) => {
         // Increment level
         game.currentLevel++;
 
-        // Check if all levels complete (max 3 levels)
-        if (game.currentLevel > 3) {
-            game.player1.socket.emit('parkourGameComplete');
-            game.player2.socket.emit('parkourGameComplete');
+        console.log(`[Parkour] Level ${game.currentLevel - 1} complete, moving to level ${game.currentLevel}`);
+
+        // Check if all levels complete (10 levels total)
+        if (game.currentLevel > 10) {
+            console.log(`[Parkour] All levels complete! Game ${data.gameId} finished`);
+            io.to(game.player1.id).emit('parkourGameComplete');
+            io.to(game.player2.id).emit('parkourGameComplete');
             parkourGames.delete(data.gameId);
         } else {
             // Start next level
-            game.player1.socket.emit('parkourNextLevel', { level: game.currentLevel });
-            game.player2.socket.emit('parkourNextLevel', { level: game.currentLevel });
+            io.to(game.player1.id).emit('parkourNextLevel', { level: game.currentLevel });
+            io.to(game.player2.id).emit('parkourNextLevel', { level: game.currentLevel });
         }
     });
 
@@ -525,8 +543,9 @@ io.on('connection', (socket) => {
         const game = parkourGames.get(data.gameId);
         if (!game) return;
 
-        const opponent = game.player1.id === socket.id ? game.player2 : game.player1;
-        opponent.socket.emit('parkourOpponentLeft');
+        console.log(`[Parkour] Player left game ${data.gameId}`);
+        const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+        io.to(opponentId).emit('parkourOpponentLeft');
         parkourGames.delete(data.gameId);
     });
 
@@ -545,8 +564,8 @@ io.on('connection', (socket) => {
             // Aus Lobby entfernen
             lobbies.forEach((lobby, lobbyId) => {
                 if (lobby.player1.id === socket.id || lobby.player2.id === socket.id) {
-                    const opponent = lobby.player1.id === socket.id ? lobby.player2 : lobby.player1;
-                    opponent.socket.emit('opponentLeftLobby');
+                    const opponentId = lobby.player1.id === socket.id ? lobby.player2.id : lobby.player1.id;
+                    io.to(opponentId).emit('opponentLeftLobby');
                     lobbies.delete(lobbyId);
                 }
             });
@@ -558,8 +577,8 @@ io.on('connection', (socket) => {
                 games.delete(gameId);
             } else if (!game.isBot) {
                 if (game.player1.id === socket.id || game.player2.id === socket.id) {
-                    const opponent = game.player1.id === socket.id ? game.player2 : game.player1;
-                    opponent.socket.emit('opponentDisconnected');
+                    const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+                    io.to(opponentId).emit('opponentDisconnected');
                     games.delete(gameId);
                 }
             }
@@ -573,8 +592,8 @@ io.on('connection', (socket) => {
 
         parkourGames.forEach((game, gameId) => {
             if (game.player1.id === socket.id || game.player2.id === socket.id) {
-                const opponent = game.player1.id === socket.id ? game.player2 : game.player1;
-                opponent.socket.emit('parkourOpponentLeft');
+                const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+                io.to(opponentId).emit('parkourOpponentLeft');
                 parkourGames.delete(gameId);
             }
         });

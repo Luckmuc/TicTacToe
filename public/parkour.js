@@ -1,4 +1,7 @@
 // Parkour Game
+// Use global socket from game.js
+const socket = window.socket;
+
 const parkourSearchingScreen = document.getElementById('parkourSearchingScreen');
 const parkourScreen = document.getElementById('parkourScreen');
 const parkourCanvas = document.getElementById('parkourCanvas');
@@ -428,10 +431,7 @@ document.addEventListener('keyup', (e) => {
 // Event listeners
 if (playParkourBtn) {
     playParkourBtn.addEventListener('click', () => {
-        socket.emit('searchParkour');
-        showParkourScreen('searching');
-    });
-}
+        console.log('[Parkour Client] Searching for parkour game...');\n        socket.emit('searchParkour');\n        showParkourScreen('searching');\n    });\n}
 
 if (cancelParkourSearchBtn) {
     cancelParkourSearchBtn.addEventListener('click', () => {
@@ -518,10 +518,12 @@ function showParkourScreen(screen) {
 
 // Socket events
 socket.on('parkourSearching', () => {
+    console.log('[Parkour Client] Received parkourSearching event');
     showParkourScreen('searching');
 });
 
 socket.on('parkourGameStart', (data) => {
+    console.log('[Parkour Client] Game starting!', data);
     parkourGameId = data.gameId;
     myPlayerId = socket.id;
     teammateId = data.teammate;

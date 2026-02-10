@@ -1,4 +1,6 @@
-const socket = io();
+// Global socket connection (accessible by parkour.js and other modules)
+window.socket = io();
+const socket = window.socket;
 
 // State
 let username = '';
