@@ -152,6 +152,11 @@ input[type="text"]:focus {
     color: var(--text-color);
 }
 
+.btn-accent {
+    background: linear-gradient(135deg, var(--warning-color), #dd6b20);
+    color: white;
+}
+
 .btn-large {
     padding: 20px 30px;
     font-size: 1.2rem;
@@ -690,6 +695,84 @@ input[type="range"] {
 
 .button-group-overlay .btn {
     min-width: 200px;
+}
+
+/* Parkour Game Styles */
+.parkour-container {
+    max-width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.parkour-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.parkour-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.parkour-info span {
+    color: var(--primary-color);
+}
+
+.parkour-separator {
+    color: var(--text-secondary) !important;
+    font-size: 1.5rem;
+}
+
+.parkour-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 1rem;
+}
+
+.parkour-stats span {
+    color: var(--text-secondary);
+}
+
+.parkour-stats span span {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+#parkourCanvas {
+    flex: 1;
+    background: var(--card-bg);
+    border-radius: 10px;
+    display: block;
+    max-height: calc(100vh - 200px);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.parkour-controls {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.control-info {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.control-info p {
+    margin: 0;
 }
 
 /* Responsive */

@@ -238,6 +238,15 @@ function initGame(data) {
     opponentName = data.opponentUsername;
     yourUsername = data.yourUsername;
     
+    // Für Multiplayer: isPlayer1 bestimmen (Bot hat das nicht)
+    if (data.mode === 'multiplayer') {
+        // Bei Multiplayer kommt das vom Server in der Lobby
+        // isPlayer1 bleibt wie es ist
+    } else {
+        // Bei Bot-Spielen ist der Spieler immer "Player 1"
+        isPlayer1 = true;
+    }
+    
     gameOptions = {
         matchCount: data.matchCount || 1,
         competitive: data.competitive || false
@@ -467,6 +476,11 @@ socket.on('nextMatch', (data) => {
     mySymbol = data.symbol;
     opponentSymbol = data.symbol === 'X' ? 'O' : 'X';
     
+    // isPlayer1 aktualisieren falls im Multiplayer
+    if (data.isPlayer1 !== undefined) {
+        isPlayer1 = data.isPlayer1;
+    }
+    
     playerSymbolEl.textContent = mySymbol;
     playerSymbolEl.className = `player-symbol ${mySymbol.toLowerCase()}`;
     opponentSymbolEl.textContent = opponentSymbol;
@@ -475,9 +489,15 @@ socket.on('nextMatch', (data) => {
     matchInfo.textContent = `Spiel ${data.matchNumber} von ${gameOptions.matchCount}`;
     
     if (data.scores) {
-        yourScore.textContent = data.scores.player1;
+        // Scores richtig zuordnen basierend auf isPlayer1
+        if (isPlayer1) {
+            yourScore.textContent = data.scores.player1;
+            opponentScore.textContent = data.scores.player2;
+        } else {
+            yourScore.textContent = data.scores.player2;
+            opponentScore.textContent = data.scores.player1;
+        }
         drawScore.textContent = data.scores.draws;
-        opponentScore.textContent = data.scores.player2;
     }
 
     cells.forEach(cell => {

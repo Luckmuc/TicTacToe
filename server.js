@@ -19,6 +19,8 @@ const games = new Map();
 const players = new Map();
 const lobbies = new Map();
 const waitingPlayers = [];
+const parkourGames = new Map();
+const waitingParkourPlayers = [];
 
 io.on('connection', (socket) => {
     console.log(`Neuer Spieler verbunden: ${socket.id}`);
@@ -373,14 +375,16 @@ io.on('connection', (socket) => {
                                     matchNumber: game.currentMatch + 1,
                                     totalMatches: game.options.matchCount,
                                     scores: game.scores,
-                                    symbol: p1Symbol
+                                    symbol: p1Symbol,
+                                    isPlayer1: true
                                 });
 
                                 game.player2.socket.emit('nextMatch', {
                                     matchNumber: game.currentMatch + 1,
                                     totalMatches: game.options.matchCount,
                                     scores: game.scores,
-                                    symbol: p2Symbol
+                                    symbol: p2Symbol,
+                                    isPlayer1: false
                                 });
                             }, 3000);
                         } else {
@@ -405,6 +409,123 @@ io.on('connection', (socket) => {
                 }
             }
         }
+    });
+
+    // Parkour Game - Search for match
+    socket.on('searchParkour', () => {
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        // Check if already waiting
+        if (waitingParkourPlayers.includes(socket.id)) return;
+
+        // Add to waiting list
+        waitingParkourPlayers.push(socket.id);
+        socket.emit('parkourSearching');
+
+        // Try to match
+        if (waitingParkourPlayers.length >= 2) {
+            const player1Id = waitingParkourPlayers.shift();
+            const player2Id = waitingParkourPlayers.shift();
+
+            const player1 = players.get(player1Id);
+            const player2 = players.get(player2Id);
+
+            if (!player1 || !player2) {
+                // One player disconnected, add remaining back to queue
+                if (player1) waitingParkourPlayers.unshift(player1Id);
+                if (player2) waitingParkourPlayers.unshift(player2Id);
+                return;
+            }
+
+            // Create parkour game
+            const gameId = `parkour_${player1Id}_${player2Id}_${Date.now()}`;
+            parkourGames.set(gameId, {
+                id: gameId,
+                player1: player1,
+                player2: player2,
+                currentLevel: 1,
+                startTime: Date.now()
+            });
+
+            // Notify both players
+            player1.socket.emit('parkourGameStart', {
+                gameId: gameId,
+                player1Id: player1Id,
+                player2Id: player2Id,
+                player1Name: player1.username,
+                player2Name: player2.username,
+                teammate: player2Id
+            });
+
+            player2.socket.emit('parkourGameStart', {
+                gameId: gameId,
+                player1Id: player1Id,
+                player2Id: player2Id,
+                player1Name: player1.username,
+                player2Name: player2.username,
+                teammate: player1Id
+            });
+
+            console.log(`Parkour game started: ${gameId}`);
+        }
+    });
+
+    // Cancel parkour search
+    socket.on('cancelParkourSearch', () => {
+        const index = waitingParkourPlayers.indexOf(socket.id);
+        if (index > -1) {
+            waitingParkourPlayers.splice(index, 1);
+        }
+    });
+
+    // Parkour player movement
+    socket.on('parkourMove', (data) => {
+        const game = parkourGames.get(data.gameId);
+        if (!game) return;
+
+        // Send to opponent
+        const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+        const opponent = players.get(opponentId);
+        if (opponent) {
+            opponent.socket.emit('parkourPlayerMove', {
+                playerId: socket.id,
+                x: data.x,
+                y: data.y,
+                velocityX: data.velocityX,
+                velocityY: data.velocityY
+            });
+        }
+    });
+
+    // Level complete
+    socket.on('parkourLevelComplete', (data) => {
+        const game = parkourGames.get(data.gameId);
+        if (!game) return;
+
+        // Increment level
+        game.currentLevel++;
+
+        // Check if all levels complete (max 3 levels)
+        if (game.currentLevel > 3) {
+            game.player1.socket.emit('parkourGameComplete');
+            game.player2.socket.emit('parkourGameComplete');
+            parkourGames.delete(data.gameId);
+        } else {
+            // Start next level
+            game.player1.socket.emit('parkourNextLevel', { level: game.currentLevel });
+            game.player2.socket.emit('parkourNextLevel', { level: game.currentLevel });
+        }
+    });
+
+    // Leave parkour game
+    socket.on('leaveParkour', (data) => {
+        const game = parkourGames.get(data.gameId);
+        if (!game) return;
+
+        const opponent = game.player1.id === socket.id ? game.player2 : game.player1;
+        opponent.socket.emit('parkourOpponentLeft');
+        parkourGames.delete(data.gameId);
     });
 
     // Trennung
@@ -439,6 +560,20 @@ io.on('connection', (socket) => {
                     opponent.socket.emit('opponentDisconnected');
                     games.delete(gameId);
                 }
+            }
+        });
+
+        // Parkour-Spiel beenden wenn Spieler disconnected
+        const parkourWaitingIndex = waitingParkourPlayers.indexOf(socket.id);
+        if (parkourWaitingIndex > -1) {
+            waitingParkourPlayers.splice(parkourWaitingIndex, 1);
+        }
+
+        parkourGames.forEach((game, gameId) => {
+            if (game.player1.id === socket.id || game.player2.id === socket.id) {
+                const opponent = game.player1.id === socket.id ? game.player2 : game.player1;
+                opponent.socket.emit('parkourOpponentLeft');
+                parkourGames.delete(gameId);
             }
         });
 

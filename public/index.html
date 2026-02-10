@@ -33,6 +33,9 @@
                 <button id="playMultiplayerBtn" class="btn btn-secondary btn-large">
                     Mehrspieler
                 </button>
+                <button id="playParkourBtn" class="btn btn-accent btn-large">
+                    Duo Parkour
+                </button>
             </div>
         </div>
     </div>
@@ -190,7 +193,44 @@
         </div>
     </div>
 
+    <!-- Parkour Searching Screen -->
+    <div id="parkourSearchingScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Suche Teammate...</h1>
+            <div class="card">
+                <div class="spinner"></div>
+                <p class="searching-text">Warte auf einen zweiten Spieler...</p>
+                <button id="cancelParkourSearchBtn" class="btn btn-secondary">Suche abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parkour Game Screen -->
+    <div id="parkourScreen" class="screen">
+        <div class="parkour-container">
+            <div class="parkour-header">
+                <div class="parkour-info">
+                    <span id="parkourPlayer1">Spieler 1</span>
+                    <span class="parkour-separator">+</span>
+                    <span id="parkourPlayer2">Spieler 2</span>
+                </div>
+                <div class="parkour-stats">
+                    <span>Zeit: <span id="parkourTime">0:00</span></span>
+                    <span>Level: <span id="parkourLevel">1</span></span>
+                </div>
+            </div>
+            <canvas id="parkourCanvas"></canvas>
+            <div class="parkour-controls">
+                <div class="control-info">
+                    <p>Steuerung: WASD = Bewegen & Springen | Pfeiltasten = Bewegen & Springen</p>
+                </div>
+                <button id="leaveParkourBtn" class="btn btn-secondary">Spiel verlassen</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
+    <script src="parkour.js"></script>
 </body>
 </html>
