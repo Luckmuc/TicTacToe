@@ -22,17 +22,37 @@ const waitingPlayers = [];
 const parkourGames = new Map();
 const waitingParkourPlayers = [];
 
+// Chat-Historie
+const chatMessages = [];
+
 io.on('connection', (socket) => {
     console.log(`Neuer Spieler verbunden: ${socket.id}`);
 
     // Spieler-Registrierung
     socket.on('register', (username) => {
+        // Validate username
+        if (!username || username.trim().length === 0) {
+            socket.emit('usernameError', 'Benutzername ist erforderlich');
+            return;
+        }
+
+        if (username.length > 20) {
+            socket.emit('usernameError', 'Benutzername ist zu lang (max. 20 Zeichen)');
+            return;
+        }
+
         players.set(socket.id, {
             id: socket.id,
             username: username,
             socket: socket
         });
         console.log(`Spieler registriert: ${username} (${socket.id})`);
+        socket.emit('usernameAccepted');
+    });
+
+    // Chat History anfordern
+    socket.on('getChatHistory', () => {
+        socket.emit('chatHistory', chatMessages);
     });
 
     // Bot-Spiel starten
