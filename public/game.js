@@ -515,7 +515,17 @@ socket.on('gameStart', (data) => {
     if (!yourUsername) {
         yourUsername = username;
     }
-    initGame(data);
+    
+    // Unterscheide zwischen Schach und TicTacToe
+    if (data.mode === 'chessBot' || data.mode === 'chessMultiplayer') {
+        // Schach-Spiel
+        showScreen('chessScreen');
+        // TODO: Schach-Logik initialisieren
+        console.log('Schach-Spiel gestartet:', data);
+    } else {
+        // TicTacToe
+        initGame(data);
+    }
 });
 
 socket.on('moveMade', (data) => {
