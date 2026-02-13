@@ -19,6 +19,7 @@ const games = new Map();
 const players = new Map();
 const lobbies = new Map();
 const waitingPlayers = [];
+const waitingChessPlayers = [];
 const parkourGames = new Map();
 const waitingParkourPlayers = [];
 
@@ -96,6 +97,25 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Chess Bot spielen (Placeholder - einfach GameStart senden)
+    socket.on('playChessBot', () => {
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        const gameId = `chess_bot_${socket.id}_${Date.now()}`;
+        
+        socket.emit('gameStart', {
+            gameId: gameId,
+            symbol: 'white',
+            mode: 'chessBot',
+            opponent: 'Bot',
+            opponentUsername: 'Schach-Bot',
+            yourUsername: player.username,
+            matchCount: 1,
+            competitive: false
+        });
+    });
+
     // Multiplayer-Suche
     socket.on('searchMatch', () => {
         const player = players.get(socket.id);
@@ -159,6 +179,42 @@ io.on('connection', (socket) => {
                 waitingPlayers.splice(index, 1);
             }
             socket.emit('searchCancelled');
+        }
+    });
+
+    // Chess Multiplayer-Suche
+    socket.on('searchChessMatch', () => {
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        // Prüfen ob bereits ein wartender Spieler existiert
+        if (waitingChessPlayers.length > 0) {
+            // Gegner gefunden
+            const opponent = waitingChessPlayers.shift();
+            const lobbyId = `chess_lobby_${Date.now()}`;
+
+            // Beide Spieler informieren
+            opponent.socket.emit('gameStart', {
+                lobbyId: lobbyId,
+                opponent: player.username,
+                yourUsername: opponent.username,
+                symbol: 'white',
+                mode: 'chessMultiplayer',
+                isPlayer1: true
+            });
+
+            player.socket.emit('gameStart', {
+                lobbyId: lobbyId,
+                opponent: opponent.username,
+                yourUsername: player.username,
+                symbol: 'black',
+                mode: 'chessMultiplayer',
+                isPlayer1: false
+            });
+        } else {
+            // Kein Gegner gefunden, in Queue einfügen
+            waitingChessPlayers.push(player);
+            socket.emit('searching');
         }
     });
 

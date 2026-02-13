@@ -186,6 +186,21 @@ if (playChessBtn) {
     });
 }
 
+const playChessBotBtn = document.getElementById('playChessBotBtn');
+if (playChessBotBtn) {
+    playChessBotBtn.addEventListener('click', () => {
+        socket.emit('playChessBot');
+    });
+}
+
+const playChessMultiplayerBtn = document.getElementById('playChessMultiplayerBtn');
+if (playChessMultiplayerBtn) {
+    playChessMultiplayerBtn.addEventListener('click', () => {
+        socket.emit('searchChessMatch');
+        showScreen('searching');
+    });
+}
+
 if (backFromChessMenuBtn) {
     backFromChessMenuBtn.addEventListener('click', () => {
         showScreen('menu');
