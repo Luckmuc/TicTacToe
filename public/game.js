@@ -289,6 +289,14 @@ leaveLobbyBtn.addEventListener('click', () => {
     showScreen('menu');
 });
 
+// Leave Chess Game
+const leaveChessBtn = document.getElementById('leaveChessBtn');
+if (leaveChessBtn) {
+    leaveChessBtn.addEventListener('click', () => {
+        showScreen('menu');
+    });
+}
+
 leaveGameBtn.addEventListener('click', () => {
     hideGameEndOverlay();
     resetGame();
@@ -325,6 +333,95 @@ function resetGame() {
         cell.classList.remove('filled', 'winner');
         cell.innerHTML = '';
     });
+}
+
+function initChessGame(data) {
+    currentGameId = data.gameId;
+    opponentName = data.opponent || 'Opponent';
+    yourUsername = data.yourUsername || username;
+    
+    // Update player names
+    const chessPlayer1 = document.getElementById('chessPlayer1');
+    const chessPlayer2 = document.getElementById('chessPlayer2');
+    const chessTurn = document.getElementById('chessTurn');
+    
+    if (data.symbol === 'white') {
+        chessPlayer1.textContent = yourUsername + ' (Weiß)';
+        chessPlayer2.textContent = opponentName + ' (Schwarz)';
+        isMyTurn = true;
+    } else {
+        chessPlayer1.textContent = opponentName + ' (Weiß)';
+        chessPlayer2.textContent = yourUsername + ' (Schwarz)';
+        isMyTurn = false;
+    }
+    
+    chessTurn.textContent = 'Weiß am Zug';
+    
+    // Create chess board (8x8)
+    const chessBoard = document.getElementById('chessBoard');
+    chessBoard.innerHTML = '';
+    
+    for (let i = 0; i < 64; i++) {
+        const square = document.createElement('div');
+        square.className = 'chess-square';
+        
+        // Alternating colors (light/dark)
+        const row = Math.floor(i / 8);
+        const col = i % 8;
+        if ((row + col) % 2 === 0) {
+            square.classList.add('light');
+        } else {
+            square.classList.add('dark');
+        }
+        
+        square.dataset.index = i;
+        chessBoard.appendChild(square);
+    }
+    
+    // Add initial pieces
+    initChessPieces();
+}
+
+function initChessPieces() {
+    const chessBoard = document.getElementById('chessBoard');
+    
+    // Piece symbols
+    const pieces = {
+        'white': { 'p': '♙', 'r': '♖', 'n': '♘', 'b': '♗', 'q': '♕', 'k': '♔' },
+        'black': { 'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚' }
+    };
+    
+    // Starting position
+    const initialBoard = [
+        ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+        ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+        ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+    ];
+    
+    // Place pieces on board
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const piece = initialBoard[row][col];
+            if (piece) {
+                const index = row * 8 + col;
+                const square = chessBoard.children[index];
+                
+                const isWhite = piece === piece.toUpperCase();
+                const pieceLower = piece.toLowerCase();
+                const symbol = pieces[isWhite ? 'white' : 'black'][pieceLower];
+                
+                const pieceEl = document.createElement('div');
+                pieceEl.className = `chess-piece ${isWhite ? 'white' : 'black'}`;
+                pieceEl.textContent = symbol;
+                square.appendChild(pieceEl);
+            }
+        }
+    }
 }
 
 function initGame(data) {
@@ -522,9 +619,8 @@ socket.on('gameStart', (data) => {
     // Unterscheide zwischen Schach und TicTacToe
     if (data.mode === 'chessBot' || data.mode === 'chessMultiplayer') {
         // Schach-Spiel
+        initChessGame(data);
         showScreen('chessScreen');
-        // TODO: Schach-Logik initialisieren
-        console.log('Schach-Spiel gestartet:', data);
     } else {
         // TicTacToe
         initGame(data);
