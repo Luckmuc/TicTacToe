@@ -189,8 +189,11 @@ if (playChessBtn) {
 const playChessBotBtn = document.getElementById('playChessBotBtn');
 if (playChessBotBtn) {
     playChessBotBtn.addEventListener('click', () => {
+        console.log('Chess Bot Button Clicked');
         socket.emit('playChessBot');
     });
+} else {
+    console.warn('playChessBotBtn nicht gefunden!');
 }
 
 const playChessMultiplayerBtn = document.getElementById('playChessMultiplayerBtn');
