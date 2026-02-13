@@ -1,6 +1,6 @@
 // Global socket connection (accessible by parkour.js and other modules)
 window.socket = io();
-const socket = window.socket;
+var socket = window.socket;
 
 // State
 let username = '';
@@ -20,18 +20,26 @@ let isReady = false;
 const screens = {
     username: document.getElementById('usernameScreen'),
     menu: document.getElementById('menuScreen'),
+    ticTacToeMenu: document.getElementById('ticTacToeMenuScreen'),
     options: document.getElementById('optionsScreen'),
     searching: document.getElementById('searchingScreen'),
     lobby: document.getElementById('lobbyScreen'),
-    game: document.getElementById('gameScreen')
+    game: document.getElementById('gameScreen'),
+    chessMenu: document.getElementById('chessMenuScreen'),
+    chat: document.getElementById('chatScreen')
 };
 
 // Elements
 const usernameInput = document.getElementById('usernameInput');
 const submitUsername = document.getElementById('submitUsername');
 const usernameDisplay = document.getElementById('usernameDisplay');
+const playTicTacToeBtn = document.getElementById('playTicTacToeBtn');
 const playBotBtn = document.getElementById('playBotBtn');
 const playMultiplayerBtn = document.getElementById('playMultiplayerBtn');
+const playChessBtn = document.getElementById('playChessBtn');
+const openChatBtn = document.getElementById('openChatBtn');
+const backFromTicTacToeMenuBtn = document.getElementById('backFromTicTacToeMenuBtn');
+const backFromChessMenuBtn = document.getElementById('backFromChessMenuBtn');
 const startSearchBtn = document.getElementById('startSearchBtn');
 const backToMenuBtn = document.getElementById('backToMenuBtn');
 const cancelSearchBtn = document.getElementById('cancelSearchBtn');
@@ -79,8 +87,20 @@ const backToMenuFromGame = document.getElementById('backToMenuFromGame');
 
 // Helper Functions
 function showScreen(screenName) {
-    Object.values(screens).forEach(screen => screen.classList.remove('active'));
-    screens[screenName].classList.add('active');
+    // Hide all screens
+    Object.values(screens).forEach(screen => {
+        if (screen) screen.classList.remove('active');
+    });
+    // Also hide game-specific screens
+    const otherScreens = ['parkourSearchingScreen', 'parkourScreen', 'chessSearchingScreen', 'chessScreen'];
+    otherScreens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+    });
+    // Show requested screen
+    if (screens[screenName]) {
+        screens[screenName].classList.add('active');
+    }
 }
 
 function showGameEndOverlay() {
@@ -105,9 +125,11 @@ submitUsername.addEventListener('click', () => {
     if (name) {
         username = name;
         socket.emit('register', username);
-        usernameDisplay.textContent = username;
-        showScreen('menu');
     }
+});
+
+usernameInput.addEventListener('keydown', (e) => {
+    e.stopPropagation();
 });
 
 usernameInput.addEventListener('keypress', (e) => {
@@ -116,16 +138,70 @@ usernameInput.addEventListener('keypress', (e) => {
     }
 });
 
-// Menu Screen
-playBotBtn.addEventListener('click', () => {
-    gameMode = 'bot';
-    socket.emit('playBot');
+// Handle username validation responses
+socket.on('usernameAccepted', () => {
+    usernameDisplay.textContent = username;
+    showScreen('menu');
+    // Request chat history now that we're registered
+    socket.emit('getChatHistory');
 });
 
-playMultiplayerBtn.addEventListener('click', () => {
-    gameMode = 'multiplayer';
-    showScreen('options');
+socket.on('usernameError', (message) => {
+    alert(message);
+    usernameInput.focus();
 });
+
+// Menu Screen
+if (playTicTacToeBtn) {
+    playTicTacToeBtn.addEventListener('click', () => {
+        showScreen('ticTacToeMenu');
+    });
+}
+
+// TicTacToe Menu Screen
+if (playBotBtn) {
+    playBotBtn.addEventListener('click', () => {
+        gameMode = 'bot';
+        socket.emit('playBot');
+    });
+}
+
+if (playMultiplayerBtn) {
+    playMultiplayerBtn.addEventListener('click', () => {
+        gameMode = 'multiplayer';
+        showScreen('options');
+    });
+}
+
+if (backFromTicTacToeMenuBtn) {
+    backFromTicTacToeMenuBtn.addEventListener('click', () => {
+        showScreen('menu');
+    });
+}
+
+// Chess Menu
+if (playChessBtn) {
+    playChessBtn.addEventListener('click', () => {
+        showScreen('chessMenu');
+    });
+}
+
+if (backFromChessMenuBtn) {
+    backFromChessMenuBtn.addEventListener('click', () => {
+        showScreen('menu');
+    });
+}
+
+// Open Chat
+if (openChatBtn) {
+    openChatBtn.addEventListener('click', () => {
+        showScreen('chat');
+        const chatInputEl = document.getElementById('chatInput');
+        if (chatInputEl) {
+            chatInputEl.focus();
+        }
+    });
+}
 
 // Options Screen
 startSearchBtn.addEventListener('click', () => {

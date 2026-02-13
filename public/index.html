@@ -4,15 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Tic Tac Toe Online</title>
+    <title>Game Hub</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- Username Screen -->
     <div id="usernameScreen" class="screen active">
         <div class="container">
-            <h1 class="title">Tic Tac Toe</h1>
+            <h1 class="title">Game Hub</h1>
             <div class="card">
                 <h2>Benutzername eingeben</h2>
                 <input type="text" id="usernameInput" placeholder="Dein Name" maxlength="20">
@@ -24,18 +25,61 @@
     <!-- Menu Screen -->
     <div id="menuScreen" class="screen">
         <div class="container">
-            <h1 class="title">Tic Tac Toe</h1>
+            <h1 class="title">Game Hub</h1>
             <div class="welcome">Willkommen, <span id="usernameDisplay"></span>!</div>
             <div class="menu-buttons">
-                <button id="playBotBtn" class="btn btn-primary btn-large">
-                    Gegen Bot spielen
-                </button>
-                <button id="playMultiplayerBtn" class="btn btn-secondary btn-large">
-                    Mehrspieler
-                </button>
                 <button id="playParkourBtn" class="btn btn-accent btn-large">
                     Duo Parkour
                 </button>
+                <button id="playTicTacToeBtn" class="btn btn-primary btn-large">
+                    TicTacToe
+                </button>
+                <button id="playChessBtn" class="btn btn-chess btn-large">
+                    Schach
+                </button>
+                <button id="openChatBtn" class="btn btn-chat btn-large">
+                    Chat
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TicTacToe Menu Screen -->
+    <div id="ticTacToeMenuScreen" class="screen">
+        <div class="container">
+            <h1 class="title">TicTacToe</h1>
+            <div class="card">
+                <div class="menu-buttons">
+                    <button id="playBotBtn" class="btn btn-primary btn-large">
+                        Gegen Bot spielen
+                    </button>
+                    <button id="playMultiplayerBtn" class="btn btn-secondary btn-large">
+                        TicTacToe Mehrspieler
+                    </button>
+                    <button id="backFromTicTacToeMenuBtn" class="btn btn-secondary">
+                        Zurück
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chess Menu Screen -->
+    <div id="chessMenuScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Schach</h1>
+            <div class="card">
+                <div class="menu-buttons">
+                    <button id="playChessBotBtn" class="btn btn-primary btn-large">
+                        Gegen Bot spielen
+                    </button>
+                    <button id="playChessMultiplayerBtn" class="btn btn-secondary btn-large">
+                        Online Multiplayer
+                    </button>
+                    <button id="backFromChessMenuBtn" class="btn btn-secondary">
+                        Zurück
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -223,13 +267,65 @@
             <div class="parkour-touch-controls">
                 <button id="touchLeftBtn" class="touch-btn">◀</button>
                 <button id="touchJumpBtn" class="touch-btn touch-jump">▲</button>
+                <button id="touchDownBtn" class="touch-btn touch-down">▼</button>
+                <button id="touchRopeBtn" class="touch-btn touch-rope">Seil</button>
                 <button id="touchRightBtn" class="touch-btn">▶</button>
             </div>
             <div class="parkour-controls">
                 <div class="control-info">
                     <p>Steuerung: WASD = Bewegen & Springen | Pfeiltasten = Bewegen & Springen</p>
+                    <p>R = Seil werfen | E = Seil greifen | W/S = Hoch/Runter</p>
                 </div>
                 <button id="leaveParkourBtn" class="btn btn-secondary">Spiel verlassen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chess Searching Screen -->
+    <div id="chessSearchingScreen" class="screen">
+        <div class="container">
+            <h1 class="title">Suche Gegner...</h1>
+            <div class="card">
+                <div class="spinner"></div>
+                <p class="searching-text">Warte auf einen Schach-Gegner...</p>
+                <button id="cancelChessSearchBtn" class="btn btn-secondary">Suche abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chess Game Screen -->
+    <div id="chessScreen" class="screen">
+        <div class="chess-container">
+            <div class="chess-header">
+                <div class="chess-player-info">
+                    <span id="chessPlayer1" class="chess-player-name">Spieler 1</span>
+                </div>
+                <div class="chess-status-container">
+                    <div id="chessTurn" class="chess-turn">Weiß am Zug</div>
+                    <div id="chessStatus" class="chess-game-status"></div>
+                </div>
+                <div class="chess-player-info">
+                    <span id="chessPlayer2" class="chess-player-name">Spieler 2</span>
+                </div>
+            </div>
+            <div id="chessBoard" class="chess-board"></div>
+            <div class="chess-controls">
+                <button id="leaveChessBtn" class="btn btn-secondary">Spiel verlassen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chatScreen" class="screen">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>Global Chat</h2>
+                <button id="closeChatBtn" class="btn btn-secondary btn-small">Zurück</button>
+            </div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chatInput" placeholder="Nachricht eingeben..." maxlength="500">
+                <button id="sendChatBtn" class="btn btn-primary">Senden</button>
             </div>
         </div>
     </div>
@@ -237,5 +333,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
     <script src="parkour.js"></script>
+    <script src="chess.js"></script>
+    <script src="chat.js"></script>
 </body>
 </html>
