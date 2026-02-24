@@ -186,24 +186,31 @@ if (playChessBtn) {
     });
 }
 
-const playChessBotBtn = document.getElementById('playChessBotBtn');
-if (playChessBotBtn) {
-    playChessBotBtn.addEventListener('click', () => {
-        console.log('Chess Bot Button Clicked');
+// Ensure chess buttons always have a fallback handler (delegates to chess.js via socket events)
+const playChessBotBtnFallback = document.getElementById('playChessBotBtn');
+if (playChessBotBtnFallback) {
+    playChessBotBtnFallback.addEventListener('click', () => {
+        console.log('playChessBot (fallback) clicked');
         socket.emit('playChessBot');
     });
-} else {
-    console.warn('playChessBotBtn nicht gefunden!');
 }
 
-const playChessMultiplayerBtn = document.getElementById('playChessMultiplayerBtn');
-if (playChessMultiplayerBtn) {
-    playChessMultiplayerBtn.addEventListener('click', () => {
-        socket.emit('searchChessMatch');
-        showScreen('searching');
+const playChessMultiplayerBtnFallback = document.getElementById('playChessMultiplayerBtn');
+if (playChessMultiplayerBtnFallback) {
+    playChessMultiplayerBtnFallback.addEventListener('click', () => {
+        console.log('searchChess (fallback) clicked');
+        // emit the search event expected by the server
+        socket.emit('searchChess');
+        // show dedicated chess searching screen if available
+        if (typeof showChessScreen === 'function') {
+            try { showChessScreen('searching'); } catch (e) { showScreen('searching'); }
+        } else {
+            showScreen('searching');
+        }
     });
 }
 
+// Back from chess menu
 if (backFromChessMenuBtn) {
     backFromChessMenuBtn.addEventListener('click', () => {
         showScreen('menu');

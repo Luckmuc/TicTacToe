@@ -22,6 +22,159 @@ const waitingPlayers = [];
 const waitingChessPlayers = [];
 const parkourGames = new Map();
 const waitingParkourPlayers = [];
+const chessGames = new Map();
+
+// ── Chess helpers ─────────────────────────────────────────────────────────────
+const CHESS_INITIAL_BOARD = [
+    ['r','n','b','q','k','b','n','r'],
+    ['p','p','p','p','p','p','p','p'],
+    [null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null],
+    ['P','P','P','P','P','P','P','P'],
+    ['R','N','B','Q','K','B','N','R']
+];
+
+function cloneBoard(b) { return b.map(r => [...r]); }
+
+function applyChessMove(board, from, to) {
+    const nb = cloneBoard(board);
+    const piece = nb[from.row][from.col];
+    // Promotion
+    if (piece === 'P' && to.row === 0) nb[to.row][to.col] = 'Q';
+    else if (piece === 'p' && to.row === 7) nb[to.row][to.col] = 'q';
+    else nb[to.row][to.col] = piece;
+    nb[from.row][from.col] = null;
+    return nb;
+}
+
+function isPathClearServer(board, fr, fc, tr, tc) {
+    const dr = Math.sign(tr - fr), dc = Math.sign(tc - fc);
+    let r = fr + dr, c = fc + dc;
+    while (r !== tr || c !== tc) {
+        if (board[r][c]) return false;
+        r += dr; c += dc;
+    }
+    return true;
+}
+
+/** Generate all legal moves for the piece at (fr,fc) */
+function getLegalMovesServer(board, fr, fc) {
+    const piece = board[fr][fc];
+    if (!piece) return [];
+    const isWhite = piece === piece.toUpperCase();
+    const t = piece.toUpperCase();
+    const moves = [];
+
+    const tryAdd = (tr, tc) => {
+        if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false;
+        const target = board[tr][tc];
+        if (target && (target === target.toUpperCase()) === isWhite) return false; // own piece
+        const nb = applyChessMove(board, { row: fr, col: fc }, { row: tr, col: tc });
+        if (!isInCheckServer(nb, isWhite)) moves.push({ from: { row: fr, col: fc }, to: { row: tr, col: tc } });
+        return !!target; // true = stop sliding
+    };
+
+    switch (t) {
+        case 'P': {
+            const dir = isWhite ? -1 : 1;
+            const startRow = isWhite ? 6 : 1;
+            const nr = fr + dir;
+            if (nr >= 0 && nr < 8) {
+                if (!board[nr][fc]) {
+                    tryAdd(nr, fc);
+                    if (fr === startRow && !board[nr + dir]?.[fc]) tryAdd(nr + dir, fc);
+                }
+                [-1, 1].forEach(dc => {
+                    const nc = fc + dc;
+                    if (nc >= 0 && nc < 8) {
+                        const tgt = board[nr][nc];
+                        if (tgt && (tgt === tgt.toUpperCase()) !== isWhite) tryAdd(nr, nc);
+                    }
+                });
+            }
+            break;
+        }
+        case 'N':
+            [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+                .forEach(([dr,dc]) => tryAdd(fr+dr, fc+dc));
+            break;
+        case 'K':
+            for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++)
+                if (dr||dc) tryAdd(fr+dr, fc+dc);
+            break;
+        case 'R':
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dr,dc]) => {
+                let r=fr+dr, c=fc+dc;
+                while (r>=0&&r<8&&c>=0&&c<8) { if (tryAdd(r,c)) break; r+=dr; c+=dc; }
+            });
+            break;
+        case 'B':
+            [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc]) => {
+                let r=fr+dr, c=fc+dc;
+                while (r>=0&&r<8&&c>=0&&c<8) { if (tryAdd(r,c)) break; r+=dr; c+=dc; }
+            });
+            break;
+        case 'Q':
+            [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc]) => {
+                let r=fr+dr, c=fc+dc;
+                while (r>=0&&r<8&&c>=0&&c<8) { if (tryAdd(r,c)) break; r+=dr; c+=dc; }
+            });
+            break;
+    }
+    return moves;
+}
+
+function isInCheckServer(board, isWhite) {
+    const kp = isWhite ? 'K' : 'k';
+    let kr = -1, kc = -1;
+    outer: for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (board[r][c] === kp) { kr = r; kc = c; break outer; }
+    if (kr === -1) return true;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+        const p = board[r][c];
+        if (!p) continue;
+        if ((p === p.toUpperCase()) === isWhite) continue;
+        // Use fast attack check (no full legal move gen needed here)
+        const t = p.toUpperCase();
+        const dr = kr - r, dc = kc - c;
+        const isW = p === p.toUpperCase();
+        let attacks = false;
+        switch (t) {
+            case 'P': attacks = dr === (isW ? -1 : 1) && Math.abs(dc) === 1; break;
+            case 'N': attacks = (Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2); break;
+            case 'K': attacks = Math.abs(dr)<=1&&Math.abs(dc)<=1; break;
+            case 'R': attacks = (dr===0||dc===0)&&isPathClearServer(board,r,c,kr,kc); break;
+            case 'B': attacks = Math.abs(dr)===Math.abs(dc)&&isPathClearServer(board,r,c,kr,kc); break;
+            case 'Q': attacks = ((dr===0||dc===0)||Math.abs(dr)===Math.abs(dc))&&isPathClearServer(board,r,c,kr,kc); break;
+        }
+        if (attacks) return true;
+    }
+    return false;
+}
+
+function getChessGameStatus(board, isWhiteTurn) {
+    for (let fr = 0; fr < 8; fr++) for (let fc = 0; fc < 8; fc++) {
+        const piece = board[fr][fc];
+        if (!piece || (piece === piece.toUpperCase()) !== isWhiteTurn) continue;
+        if (getLegalMovesServer(board, fr, fc).length > 0) return 'ongoing';
+    }
+    return isInCheckServer(board, isWhiteTurn) ? 'checkmate' : 'stalemate';
+}
+
+function getRandomBotMove(board) {
+    const allMoves = [];
+    for (let fr = 0; fr < 8; fr++) for (let fc = 0; fc < 8; fc++) {
+        const piece = board[fr][fc];
+        if (!piece || piece === piece.toUpperCase()) continue; // bot plays black (lowercase)
+        getLegalMovesServer(board, fr, fc).forEach(m => allMoves.push(m));
+    }
+    if (!allMoves.length) return null;
+    // Prefer captures
+    const captures = allMoves.filter(m => board[m.to.row][m.to.col]);
+    if (captures.length > 0 && Math.random() < 0.65) return captures[Math.floor(Math.random() * captures.length)];
+    return allMoves[Math.floor(Math.random() * allMoves.length)];
+}
 
 // Chat-Historie
 const chatMessages = [];
@@ -97,22 +250,28 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Chess Bot spielen (Placeholder - einfach GameStart senden)
+    // Chess Bot spielen
     socket.on('playChessBot', () => {
         const player = players.get(socket.id);
         if (!player) return;
 
         const gameId = `chess_bot_${socket.id}_${Date.now()}`;
-        
-        socket.emit('gameStart', {
-            gameId: gameId,
-            symbol: 'white',
-            mode: 'chessBot',
-            opponent: 'Bot',
-            opponentUsername: 'Schach-Bot',
-            yourUsername: player.username,
-            matchCount: 1,
-            competitive: false
+        const board = cloneBoard(CHESS_INITIAL_BOARD);
+        chessGames.set(gameId, {
+            id: gameId,
+            isBot: true,
+            player1: player,   // human = white
+            player2: null,     // bot   = black
+            board,
+            currentTurn: 'white'
+        });
+
+        socket.emit('chessGameStart', {
+            gameId,
+            color: 'white',
+            board,
+            player1Name: player.username,
+            player2Name: 'Schach-Bot'
         });
     });
 
@@ -182,39 +341,154 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Chess Multiplayer-Suche
-    socket.on('searchChessMatch', () => {
+    // Chess Multiplayer-Suche (client emits 'searchChess')
+    function handleChessSearch(socket) {
         const player = players.get(socket.id);
         if (!player) return;
 
-        // Prüfen ob bereits ein wartender Spieler existiert
-        if (waitingChessPlayers.length > 0) {
-            // Gegner gefunden
-            const opponent = waitingChessPlayers.shift();
-            const lobbyId = `chess_lobby_${Date.now()}`;
+        if (waitingChessPlayers.some(p => p.id === socket.id)) return; // already queued
 
-            // Beide Spieler informieren
-            opponent.socket.emit('gameStart', {
-                lobbyId: lobbyId,
-                opponent: player.username,
-                yourUsername: opponent.username,
-                symbol: 'white',
-                mode: 'chessMultiplayer',
-                isPlayer1: true
+        if (waitingChessPlayers.length > 0) {
+            const opponent = waitingChessPlayers.shift();
+            const gameId = `chess_mp_${Date.now()}`;
+            const board = cloneBoard(CHESS_INITIAL_BOARD);
+
+            chessGames.set(gameId, {
+                id: gameId,
+                isBot: false,
+                player1: opponent, // white
+                player2: player,   // black
+                board,
+                currentTurn: 'white'
             });
 
-            player.socket.emit('gameStart', {
-                lobbyId: lobbyId,
-                opponent: opponent.username,
-                yourUsername: player.username,
-                symbol: 'black',
-                mode: 'chessMultiplayer',
-                isPlayer1: false
+            opponent.socket.join(gameId);
+            socket.join(gameId);
+
+            opponent.socket.emit('chessGameStart', {
+                gameId,
+                color: 'white',
+                board,
+                player1Name: opponent.username,
+                player2Name: player.username
+            });
+            socket.emit('chessGameStart', {
+                gameId,
+                color: 'black',
+                board,
+                player1Name: opponent.username,
+                player2Name: player.username
             });
         } else {
-            // Kein Gegner gefunden, in Queue einfügen
             waitingChessPlayers.push(player);
-            socket.emit('searching');
+            socket.emit('chessSearching');
+        }
+    }
+
+    socket.on('searchChess', () => handleChessSearch(socket));
+    socket.on('searchChessMatch', () => handleChessSearch(socket));
+
+    // Cancel chess search
+    socket.on('cancelChessSearch', () => {
+        const idx = waitingChessPlayers.findIndex(p => p.id === socket.id);
+        if (idx !== -1) waitingChessPlayers.splice(idx, 1);
+    });
+
+    // Leave chess game
+    socket.on('leaveChess', (data) => {
+        const game = chessGames.get(data && data.gameId);
+        if (!game) return;
+        const opponentId = game.player1.id === socket.id
+            ? (game.player2 ? game.player2.id : null)
+            : game.player1.id;
+        if (opponentId) io.to(opponentId).emit('chessOpponentLeft');
+        chessGames.delete(data.gameId);
+    });
+
+    // Chess move
+    socket.on('chessMove', (data) => {
+        const game = chessGames.get(data.gameId);
+        if (!game) return;
+
+        const isWhitePlayer = game.player1.id === socket.id;
+        const myColor = isWhitePlayer ? 'white' : 'black';
+        if (game.currentTurn !== myColor) return; // not your turn
+
+        const newBoard = applyChessMove(game.board, data.from, data.to);
+        game.board = newBoard;
+
+        const nextColor = myColor === 'white' ? 'black' : 'white';
+        const nextIsWhite = nextColor === 'white';
+        const status = getChessGameStatus(newBoard, nextIsWhite);
+        const inCheck = isInCheckServer(newBoard, nextIsWhite);
+
+        let statusStr = 'ongoing';
+        let winner = null;
+        if (status === 'checkmate') { statusStr = 'checkmate'; winner = myColor; }
+        else if (status === 'stalemate') { statusStr = 'stalemate'; }
+        else if (inCheck) { statusStr = 'check'; }
+
+        if (statusStr !== 'checkmate' && statusStr !== 'stalemate') game.currentTurn = nextColor;
+
+        const moveData = {
+            board: newBoard,
+            from: data.from,
+            to: data.to,
+            currentTurn: nextColor,
+            status: statusStr,
+            winner
+        };
+
+        if (game.isBot) {
+            // Send move result to human
+            socket.emit('chessMoveMade', moveData);
+
+            if (statusStr === 'checkmate' || statusStr === 'stalemate') {
+                chessGames.delete(data.gameId);
+                return;
+            }
+
+            // Bot responds
+            setTimeout(() => {
+                const botMove = getRandomBotMove(game.board);
+                if (!botMove) {
+                    // No legal moves for bot: checkmate or stalemate
+                    const noMovesStatus = isInCheckServer(game.board, false) ? 'checkmate' : 'stalemate';
+                    const noMovesWinner = noMovesStatus === 'checkmate' ? 'white' : null;
+                    socket.emit('chessMoveMade', { board: game.board, currentTurn: 'black', status: noMovesStatus, winner: noMovesWinner });
+                    chessGames.delete(data.gameId);
+                    return;
+                }
+                const botBoard = applyChessMove(game.board, botMove.from, botMove.to);
+                game.board = botBoard;
+                game.currentTurn = 'white';
+
+                const botStatus = getChessGameStatus(botBoard, true);
+                const botInCheck = isInCheckServer(botBoard, true);
+                let botStatusStr = 'ongoing';
+                let botWinner = null;
+                if (botStatus === 'checkmate') { botStatusStr = 'checkmate'; botWinner = 'black'; }
+                else if (botStatus === 'stalemate') { botStatusStr = 'stalemate'; }
+                else if (botInCheck) { botStatusStr = 'check'; }
+
+                socket.emit('chessMoveMade', {
+                    board: botBoard,
+                    from: botMove.from,
+                    to: botMove.to,
+                    currentTurn: 'white',
+                    status: botStatusStr,
+                    winner: botWinner
+                });
+                if (botStatusStr === 'checkmate' || botStatusStr === 'stalemate') {
+                    chessGames.delete(data.gameId);
+                }
+            }, 400);
+        } else {
+            // Multiplayer - send to both via room
+            io.to(data.gameId).emit('chessMoveMade', moveData);
+            if (statusStr === 'checkmate' || statusStr === 'stalemate') {
+                chessGames.delete(data.gameId);
+            }
         }
     });
 
@@ -591,27 +865,66 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Level complete
+    // Parkour rope – forward to opponent
+    socket.on('parkourRope', (data) => {
+        const game = parkourGames.get(data.gameId);
+        if (!game) return;
+        const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+        io.to(opponentId).emit('parkourRope', data);
+    });
+
+    // Parkour rope reset – forward to opponent
+    socket.on('parkourRopeReset', (data) => {
+        const game = parkourGames.get(data.gameId);
+        if (!game) return;
+        const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+        io.to(opponentId).emit('parkourRopeReset');
+    });
+
+    // Level complete – only advance when BOTH players are at the finish
     socket.on('parkourLevelComplete', (data) => {
         const game = parkourGames.get(data.gameId);
         if (!game) return;
 
-        // Increment level
-        game.currentLevel++;
+        if (!game.playersAtFinish) game.playersAtFinish = new Set();
 
-        console.log(`[Parkour] Level ${game.currentLevel - 1} complete, moving to level ${game.currentLevel}`);
+        // Ignore duplicate signals from the same player
+        if (game.playersAtFinish.has(socket.id)) return;
 
-        // Check if all levels complete (10 levels total)
-        if (game.currentLevel > 10) {
-            console.log(`[Parkour] All levels complete! Game ${data.gameId} finished`);
-            io.to(game.player1.id).emit('parkourGameComplete');
-            io.to(game.player2.id).emit('parkourGameComplete');
-            parkourGames.delete(data.gameId);
-        } else {
-            // Start next level
-            io.to(game.player1.id).emit('parkourNextLevel', { level: game.currentLevel });
-            io.to(game.player2.id).emit('parkourNextLevel', { level: game.currentLevel });
+        game.playersAtFinish.add(socket.id);
+
+        // Notify the teammate that this player arrived
+        const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+        io.to(opponentId).emit('parkourTeammateAtFinish');
+
+        console.log(`[Parkour] Player ${socket.id} at finish. Waiting for teammate. (${game.playersAtFinish.size}/2)`);
+
+        // Only advance when both are there
+        if (game.playersAtFinish.has(game.player1.id) && game.playersAtFinish.has(game.player2.id)) {
+            game.playersAtFinish.clear();
+            game.currentLevel++;
+
+            console.log(`[Parkour] Both at finish! Moving to level ${game.currentLevel}`);
+
+            const MAX_LEVEL = 100;
+            if (game.currentLevel > MAX_LEVEL) {
+                console.log(`[Parkour] All levels complete! Game ${data.gameId} finished`);
+                io.to(game.player1.id).emit('parkourGameComplete');
+                io.to(game.player2.id).emit('parkourGameComplete');
+                parkourGames.delete(data.gameId);
+            } else {
+                io.to(game.player1.id).emit('parkourNextLevel', { level: game.currentLevel });
+                io.to(game.player2.id).emit('parkourNextLevel', { level: game.currentLevel });
+            }
         }
+    });
+
+    // Parkour respawn broadcast (so teammate sees it)
+    socket.on('parkourRespawn', (data) => {
+        const game = parkourGames.get(data.gameId);
+        if (!game) return;
+        const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+        io.to(opponentId).emit('parkourPlayerRespawn', { playerId: socket.id });
     });
 
     // Leave parkour game
@@ -671,6 +984,20 @@ io.on('connection', (socket) => {
                 const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
                 io.to(opponentId).emit('parkourOpponentLeft');
                 parkourGames.delete(gameId);
+            }
+        });
+
+        // Chess-Spiel beenden wenn Spieler disconnected
+        const chessWaitIdx = waitingChessPlayers.findIndex(p => p.id === socket.id);
+        if (chessWaitIdx !== -1) waitingChessPlayers.splice(chessWaitIdx, 1);
+
+        chessGames.forEach((game, gameId) => {
+            if (game.player1.id === socket.id || (game.player2 && game.player2.id === socket.id)) {
+                const opponentSocket = game.player1.id === socket.id
+                    ? (game.player2 ? game.player2.socket : null)
+                    : game.player1.socket;
+                if (opponentSocket) opponentSocket.emit('chessOpponentLeft');
+                chessGames.delete(gameId);
             }
         });
 

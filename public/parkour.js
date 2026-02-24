@@ -33,6 +33,8 @@ let ropeState = {
 };
 let ropeGrabbed = false;
 let finishSignalInterval = null;
+let worldHeight = 600;
+let cameraY = 0;
 
 // Game Constants
 const EASY_MODE = true;
@@ -82,55 +84,68 @@ class Player {
         this.x += this.velocityX;
         this.y += this.velocityY;
 
-        // Collision with platforms
+        // Collision with platforms – minimum-overlap (works correctly for moving platforms)
         this.onGround = false;
         platforms.forEach(platform => {
-            if (this.checkCollision(platform)) {
-                // Bottom collision
-                if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y) {
+            if (!this.checkCollision(platform)) return;
+
+            const overlapLeft   = (this.x + this.width)          - platform.x;
+            const overlapRight  = (platform.x + platform.width)  - this.x;
+            const overlapTop    = (this.y + this.height)          - platform.y;   // player bottom → platform top
+            const overlapBottom = (platform.y + platform.height)  - this.y;      // player top    → platform bottom
+
+            const minH = Math.min(overlapLeft, overlapRight);
+            const minV = Math.min(overlapTop,  overlapBottom);
+
+            if (minV <= minH) {
+                // Vertical resolution
+                if (overlapTop < overlapBottom) {
+                    // Landed on top of platform
                     this.y = platform.y - this.height;
-                    this.velocityY = 0;
+                    if (this.velocityY > 0) this.velocityY = 0;
                     this.onGround = true;
-                }
-                // Top collision
-                else if (this.velocityY < 0 && this.y - this.velocityY >= platform.y + platform.height) {
+                } else {
+                    // Hit the underside
                     this.y = platform.y + platform.height;
-                    this.velocityY = 0;
+                    if (this.velocityY < 0) this.velocityY = 0;
                 }
-                // Side collisions
-                else {
-                    if (this.velocityX > 0) {
-                        this.x = platform.x - this.width;
-                    } else if (this.velocityX < 0) {
-                        this.x = platform.x + platform.width;
-                    }
+            } else {
+                // Horizontal resolution
+                if (overlapLeft < overlapRight) {
+                    this.x = platform.x - this.width;
+                } else {
+                    this.x = platform.x + platform.width;
                 }
             }
         });
 
-        // Collision with other players (can stand on each other)
-        otherPlayers.forEach(player => {
-            if (player && player.id !== this.id) {
-                if (this.checkCollision(player)) {
-                    // Bottom collision - can stand on other player
-                    if (this.velocityY > 0 && this.y + this.height - this.velocityY <= player.y) {
-                        this.y = player.y - this.height;
-                        this.velocityY = 0;
-                        this.onGround = true;
-                    }
-                    // Top collision
-                    else if (this.velocityY < 0 && this.y - this.velocityY >= player.y + player.height) {
-                        this.y = player.y + player.height;
-                        this.velocityY = 0;
-                    }
-                    // Side collisions
-                    else {
-                        if (this.velocityX > 0) {
-                            this.x = player.x - this.width;
-                        } else if (this.velocityX < 0) {
-                            this.x = player.x + player.width;
-                        }
-                    }
+        // Collision with other players (can stand on each other) – same minimum-overlap
+        otherPlayers.forEach(other => {
+            if (!other || other.id === this.id) return;
+            if (!this.checkCollision(other)) return;
+
+            const overlapLeft   = (this.x + this.width)      - other.x;
+            const overlapRight  = (other.x + other.width)    - this.x;
+            const overlapTop    = (this.y + this.height)      - other.y;
+            const overlapBottom = (other.y + other.height)   - this.y;
+
+            const minH = Math.min(overlapLeft, overlapRight);
+            const minV = Math.min(overlapTop,  overlapBottom);
+
+            if (minV <= minH) {
+                if (overlapTop < overlapBottom) {
+                    this.y = other.y - this.height;
+                    if (this.velocityY > 0) this.velocityY = 0;
+                    this.onGround = true;
+                } else {
+                    this.y = other.y + other.height;
+                    if (this.velocityY < 0) this.velocityY = 0;
+                }
+            } else {
+                if (overlapLeft < overlapRight) {
+                    this.x = other.x - this.width;
+                } else {
+                    this.x = other.x + other.width;
                 }
             }
         });
@@ -138,11 +153,7 @@ class Player {
         // Canvas boundaries
         if (this.x < 0) this.x = 0;
         if (this.x + this.width > CANVAS_WIDTH) this.x = CANVAS_WIDTH - this.width;
-        if (this.y + this.height > CANVAS_HEIGHT) {
-            this.y = CANVAS_HEIGHT - this.height;
-            this.velocityY = 0;
-            this.onGround = true;
-        }
+        // No hard floor – fall-through is handled by death zone (worldHeight)
     }
 
     checkCollision(platform) {
@@ -1292,7 +1303,7 @@ function applyEasyMode(levelData) {
     };
 }
 
-function resetRopeState() {
+function resetRopeState(notify = true) {
     ropeState = {
         active: false,
         fromId: null,
@@ -1302,6 +1313,9 @@ function resetRopeState() {
         expiresAt: 0
     };
     ropeGrabbed = false;
+    if (notify && parkourGameId) {
+        socket.emit('parkourRopeReset', { gameId: parkourGameId });
+    }
 }
 
 function setRopeState(data) {
@@ -1352,14 +1366,17 @@ function tryThrowRope() {
 
     if (dx <= ROPE_RANGE_X && dy <= ROPE_RANGE_Y) {
         const expiresAt = Date.now() + ROPE_DURATION_MS;
-        socket.emit('parkourRope', {
+        const ropeData = {
             gameId: parkourGameId,
             fromId: myPlayerId,
             toId: teammateId,
             fromX: me.x + me.width / 2,
             fromY: me.y,
             expiresAt: expiresAt
-        });
+        };
+        // Set own rope state immediately (thrower sees the rope too)
+        setRopeState(ropeData);
+        socket.emit('parkourRope', ropeData);
     }
 }
 
@@ -1371,9 +1388,79 @@ function setupCanvas() {
 }
 
 // Initialize level
+function generateProceduralLevel(level) {
+    // Each level above 50 adds 80px of height and gets harder
+    const wh = 600 + (level - 50) * 80;
+    const speed = Math.min(2.5 + (level - 50) * 0.08, 6.5);
+    const platW = Math.max(38, 90 - (level - 50) * 0.7) | 0;
+    const verticalGap = Math.max(80, 130 - (level - 50));
+    const rng = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+
+    const platforms = [];
+    const movingPlatforms = [];
+    const spikes = [];
+
+    // Start platform
+    platforms.push({ x: 0, y: wh - 30, width: 90, height: 30 });
+    // Finish platform near top-right
+    platforms.push({ x: 900, y: 50, width: 250, height: 30, finish: true });
+
+    let curY = wh - 120;
+    let toggle = 1;
+    while (curY > 120) {
+        const bx = toggle > 0 ? rng(150, 500) : rng(600, 1050);
+        const rangeX = rng(60, 130);
+        const rangeY = rng(40, 90);
+        const isVert = Math.random() < 0.45;
+
+        if (isVert) {
+            movingPlatforms.push({
+                x: bx, y: curY, width: platW, height: 30,
+                startY: curY - rangeY, endY: curY + rangeY,
+                speed, vertical: true
+            });
+        } else {
+            movingPlatforms.push({
+                x: bx, y: curY, width: platW, height: 30,
+                startX: Math.max(0, bx - rangeX),
+                endX: Math.min(1150, bx + rangeX),
+                speed
+            });
+        }
+
+        // Random static rest platform
+        if (Math.random() < 0.28) {
+            const rx = rng(0, 1100 - platW - 10);
+            platforms.push({ x: rx, y: curY, width: platW + 20, height: 30 });
+        }
+
+        // Spikes
+        if (Math.random() < 0.25 && curY < wh - 100 && curY > 100) {
+            spikes.push({ x: bx, y: curY - 15, width: platW, height: 15 });
+        }
+
+        curY -= verticalGap;
+        toggle *= -1;
+    }
+
+    return { platforms, movingPlatforms, spikes, worldHeight: wh };
+}
+
 function initLevel(level) {
     currentLevel = level;
-    const levelData = applyEasyMode(levelDefinitions[level] || levelDefinitions[1]);
+
+    // Pick level data – procedural for levels > 50
+    let rawData;
+    if (level > 50 || !levelDefinitions[level]) {
+        rawData = generateProceduralLevel(level);
+    } else {
+        rawData = levelDefinitions[level];
+    }
+
+    const levelData = applyEasyMode(rawData);
+    worldHeight = rawData.worldHeight || 600;  // set global world height
+    cameraY = 0;                                // reset camera
+
     currentPlatforms = [...levelData.platforms];
     currentMovingPlatforms = levelData.movingPlatforms.map(mp => ({
         ...mp,
@@ -1382,22 +1469,23 @@ function initLevel(level) {
         direction: 1
     }));
     currentSpikes = [...levelData.spikes];
-    parkourLevelEl.textContent = level;
+    if (parkourLevelEl) parkourLevelEl.textContent = level;
     resetRopeState();
     stopFinishSignal();
     iAmAtFinish = false;
     teammateAtFinish = false;
-    
-    // Reset player positions
+
+    // Start near the bottom of the world
+    const startY = worldHeight - 200;
     if (parkourPlayers[myPlayerId]) {
         parkourPlayers[myPlayerId].x = 50;
-        parkourPlayers[myPlayerId].y = 400;
+        parkourPlayers[myPlayerId].y = startY;
         parkourPlayers[myPlayerId].velocityX = 0;
         parkourPlayers[myPlayerId].velocityY = 0;
     }
     if (parkourPlayers[teammateId]) {
-        parkourPlayers[teammateId].x = 50;
-        parkourPlayers[teammateId].y = 400;
+        parkourPlayers[teammateId].x = 90;
+        parkourPlayers[teammateId].y = startY;
         parkourPlayers[teammateId].velocityX = 0;
         parkourPlayers[teammateId].velocityY = 0;
     }
@@ -1443,21 +1531,33 @@ function gameLoop() {
     
     // Combine static and moving platforms for collision
     const allPlatforms = [...currentPlatforms, ...currentMovingPlatforms];
-    
-    // Clear canvas
+
+    // ── Camera: follow local player's vertical position ──────────────────────
+    if (parkourPlayers[myPlayerId]) {
+        const targetCamY = parkourPlayers[myPlayerId].y - CANVAS_HEIGHT * 0.65;
+        const clampedTarget = Math.max(0, Math.min(worldHeight - CANVAS_HEIGHT, targetCamY));
+        cameraY += (clampedTarget - cameraY) * 0.12; // smooth follow
+        if (worldHeight <= CANVAS_HEIGHT) cameraY = 0; // no scroll needed for short levels
+    }
+
+    // Clear canvas (screen space – no transform)
     ctx.fillStyle = '#1a202c';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    
-    // Draw background grid pattern
+
+    // ── Apply camera transform for all world-space drawing ───────────────────
+    ctx.save();
+    ctx.translate(0, -cameraY);
+
+    // Draw background grid pattern (world space, only visible rows)
     ctx.strokeStyle = '#2d3748';
     ctx.lineWidth = 1;
     for (let x = 0; x < CANVAS_WIDTH; x += 50) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, CANVAS_HEIGHT);
+        ctx.moveTo(x, Math.floor(cameraY / 50) * 50);
+        ctx.lineTo(x, Math.ceil((cameraY + CANVAS_HEIGHT) / 50) * 50);
         ctx.stroke();
     }
-    for (let y = 0; y < CANVAS_HEIGHT; y += 50) {
+    for (let y = Math.floor(cameraY / 50) * 50; y <= Math.ceil((cameraY + CANVAS_HEIGHT) / 50) * 50; y += 50) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(CANVAS_WIDTH, y);
@@ -1569,6 +1669,49 @@ function gameLoop() {
         }
     }
     
+    // ── Death check (inside world transform – only repositions player) ────────
+    let playerDied = false;
+    if (parkourPlayers[myPlayerId]) {
+        currentSpikes.forEach(spike => {
+            if (parkourPlayers[myPlayerId].checkCollision({
+                x: spike.x, y: spike.y, width: spike.width, height: spike.height
+            })) { playerDied = true; }
+        });
+        if (parkourPlayers[myPlayerId].y > worldHeight + 50) playerDied = true;
+
+        if (playerDied && !iAmAtFinish) {
+            const startY = worldHeight - 200;
+            parkourPlayers[myPlayerId].x = 50;
+            parkourPlayers[myPlayerId].y = startY;
+            parkourPlayers[myPlayerId].velocityX = 0;
+            parkourPlayers[myPlayerId].velocityY = 0;
+            if (ropeState.active) resetRopeState();
+            socket.emit('parkourRespawn', { gameId: parkourGameId });
+        }
+    }
+
+    // ── Update and draw players (inside world-space transform) ───────────────
+    if (parkourPlayers[myPlayerId]) {
+        const otherPlayers = [parkourPlayers[teammateId]].filter(p => p);
+        parkourPlayers[myPlayerId].update(allPlatforms, otherPlayers);
+        parkourPlayers[myPlayerId].draw(ctx, true);
+
+        socket.emit('parkourMove', {
+            gameId: parkourGameId,
+            x: parkourPlayers[myPlayerId].x,
+            y: parkourPlayers[myPlayerId].y,
+            velocityX: parkourPlayers[myPlayerId].velocityX,
+            velocityY: parkourPlayers[myPlayerId].velocityY
+        });
+    }
+
+    if (parkourPlayers[teammateId]) {
+        parkourPlayers[teammateId].draw(ctx, false);
+    }
+
+    // ── Restore to screen space for HUD ──────────────────────────────────────
+    ctx.restore();
+
     // Show waiting message if I'm at finish but teammate isn't
     if (iAmAtFinish && !teammateAtFinish) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -1578,7 +1721,7 @@ function gameLoop() {
         ctx.textAlign = 'center';
         ctx.fillText('Warte auf Teammate...', CANVAS_WIDTH / 2, 47);
     }
-    
+
     // Show message if teammate is waiting
     if (!iAmAtFinish && teammateAtFinish) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -1588,57 +1731,17 @@ function gameLoop() {
         ctx.textAlign = 'center';
         ctx.fillText('Teammate wartet am Ziel!', CANVAS_WIDTH / 2, 47);
     }
-    
-    // Check for death (spikes or fall)
-    let playerDied = false;
-    if (parkourPlayers[myPlayerId]) {
-        // Check spike collision
-        currentSpikes.forEach(spike => {
-            if (parkourPlayers[myPlayerId].checkCollision({ 
-                x: spike.x, 
-                y: spike.y, 
-                width: spike.width, 
-                height: spike.height 
-            })) {
-                playerDied = true;
-            }
-        });
-        
-        // Check fall death
-        if (parkourPlayers[myPlayerId].y > DEATH_ZONE_Y) {
-            playerDied = true;
-        }
-        
-        if (playerDied && !iAmAtFinish) {
-            // Reset player position
-            parkourPlayers[myPlayerId].x = 50;
-            parkourPlayers[myPlayerId].y = 400;
-            parkourPlayers[myPlayerId].velocityX = 0;
-            parkourPlayers[myPlayerId].velocityY = 0;
-            socket.emit('parkourRespawn', { gameId: parkourGameId });
-        }
+
+    // Vertical progress bar for tall levels
+    if (worldHeight > CANVAS_HEIGHT && parkourPlayers[myPlayerId]) {
+        const progress = 1 - Math.max(0, Math.min(1, (parkourPlayers[myPlayerId].y - 50) / (worldHeight - 100)));
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(CANVAS_WIDTH - 18, 0, 14, CANVAS_HEIGHT);
+        ctx.fillStyle = '#48bb78';
+        const barH = Math.max(4, CANVAS_HEIGHT * progress);
+        ctx.fillRect(CANVAS_WIDTH - 18, CANVAS_HEIGHT - barH, 14, barH);
     }
-    
-    // Update and draw players
-    if (parkourPlayers[myPlayerId]) {
-        const otherPlayers = [parkourPlayers[teammateId]].filter(p => p);
-        parkourPlayers[myPlayerId].update(allPlatforms, otherPlayers);
-        parkourPlayers[myPlayerId].draw(ctx, true);
-        
-        // Send position to server
-        socket.emit('parkourMove', {
-            gameId: parkourGameId,
-            x: parkourPlayers[myPlayerId].x,
-            y: parkourPlayers[myPlayerId].y,
-            velocityX: parkourPlayers[myPlayerId].velocityX,
-            velocityY: parkourPlayers[myPlayerId].velocityY
-        });
-    }
-    
-    if (parkourPlayers[teammateId]) {
-        parkourPlayers[teammateId].draw(ctx, false);
-    }
-    
+
     // Update timer
     if (gameStartTime > 0) {
         const elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
@@ -1911,6 +2014,21 @@ socket.on('parkourGameStart', (data) => {
 socket.on('parkourRope', (data) => {
     if (data.gameId !== parkourGameId) return;
     setRopeState(data);
+});
+
+socket.on('parkourRopeReset', () => {
+    resetRopeState(false); // reset locally without re-notifying server
+});
+
+socket.on('parkourPlayerRespawn', (data) => {
+    // Snap teammate to start position when they respawn
+    if (parkourPlayers[data.playerId] && data.playerId !== myPlayerId) {
+        const startY = worldHeight - 200;
+        parkourPlayers[data.playerId].x = 90;
+        parkourPlayers[data.playerId].y = startY;
+        parkourPlayers[data.playerId].velocityX = 0;
+        parkourPlayers[data.playerId].velocityY = 0;
+    }
 });
 
 socket.on('parkourPlayerMove', (data) => {
